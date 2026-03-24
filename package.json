@@ -1,44 +1,13 @@
 {
   "name": "aceforge",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "main": "index.ts",
-  "openclaw": {
-    "extensions": [
-      "./index.ts"
-    ]
-  },
-  "peerDependencies": {
-    "openclaw": ">=2026.3.22"
-  },
-  "devDependencies": {
-    "@types/node": "^22.0.0",
-    "typescript": "^5.4.0"
-  },
-  "files": [
-    "index.ts",
-    "src/",
-    "openclaw.plugin.json",
-    "assets/",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md"
-  ],
-  "scripts": {
-    "test": "npx tsx tests/test-validator.ts"
-  },
-  "keywords": [
-    "openclaw",
-    "plugin",
-    "skill",
-    "auto-generation",
-    "ai-agent",
-    "self-evolving"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/sudokrang/aceforge"
-  },
-  "description": "Self-evolving skill engine for OpenClaw agents — dual-model LLM pipeline that turns tool usage patterns into permanent expertise",
-  "license": "MIT"
+  "openclaw": { "extensions": ["./index.ts"] },
+  "peerDependencies": { "openclaw": ">=2026.3.22" },
+  "devDependencies": { "@types/node": "^22.0.0", "typescript": "^5.4.0" },
+  "scripts": { "test": "npx tsx tests/test-validator.ts" },
+  "description": "Self-evolving skill engine for OpenClaw agents — Phase 1 core + Phase 2 proactive intelligence + Phase 3 self-validation",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/sudokrang/aceforge" }
 }

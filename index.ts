@@ -1,12 +1,15 @@
 /**
  * AceForge — Self-Evolving Skill Engine for OpenClaw
- * v0.6.0: SDK migration, full bug sweep, upgrade engine, gap analysis, effectiveness watchdog
+ * v0.7.0: Phase 2 (Proactive Intelligence) + Phase 3 (Self-Validation)
  *
- * Uses definePluginEntry from openclaw/plugin-sdk/plugin-entry (2026.3.22+)
+ * Phase 1: Core engine (v0.1–v0.6.1) — pattern detection, skill crystallization, lifecycle
+ * Phase 2: Proactive intelligence — capability tree, cross-session propagation, composition,
+ *          proactive gap detection, description optimization, autonomous adjustment
+ * Phase 3: Self-validation — health testing, grounded challenges, adversarial robustness
  */
 import * as fs from "fs";
-import * as path from "path";
 import * as os from "os";
+import * as path from "path";
 import { ensureForgeDir } from "./src/pattern/store.js";
 import { captureToolTrace } from "./src/pattern/capture.js";
 import { detectCorrectionPatterns } from "./src/pattern/detect.js";
@@ -14,7 +17,6 @@ import { analyzePatterns } from "./src/pattern/analyze.js";
 import { buildHierarchicalSkillIndex } from "./src/skill/index.js";
 import { notify } from "./src/notify.js";
 import { resetLlmRateLimit } from "./src/skill/llm-generator.js";
-import { resetJudgeRateLimit } from "./src/skill/llm-judge.js";
 import {
   recordActivation,
   recordDeploymentBaseline,
@@ -33,6 +35,19 @@ import {
 import { checkVikingHealth } from "./src/viking/client.js";
 import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";
 import { detectGaps } from "./src/pattern/gap-detect.js";
+
+// ─── Phase 2 imports ────────────────────────────────────────────────────
+import { buildCapabilityTree, formatCapabilityTree, getPriorityDomains } from "./src/intelligence/capability-tree.js";
+import { mergePatterns, formatCrossSessionReport, getCrossSessionCandidates } from "./src/intelligence/cross-session.js";
+import { detectCoActivations, formatCompositionReport, getCompositionCandidates } from "./src/intelligence/composition.js";
+import { summarizeBehaviorGaps, formatBehaviorGapReport, updateTreeWithBehaviorGaps } from "./src/intelligence/proactive-gaps.js";
+import { detectDescriptionMismatches, formatOptimizationReport } from "./src/intelligence/description-optimizer.js";
+import { handleCorrectionForSkill } from "./src/intelligence/auto-adjust.js";
+
+// ─── Phase 3 imports ────────────────────────────────────────────────────
+import { runAllHealthTests, formatHealthTestReport } from "./src/validation/health-test.js";
+import { generateChallenges, formatChallengeReport } from "./src/validation/grounded-challenges.js";
+import { runAdversarialTests, formatAdversarialReport } from "./src/validation/adversarial.js";
 
 // ─── Paths ────────────────────────────────────────────────────────────────
 const HOME = os.homedir() || process.env.HOME || "";
@@ -93,7 +108,6 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
     const result = validateSkillMd(content, skillName);
     if (!result.valid) {
       if (result.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
-        // Roll back — remove from skills dir
         fs.rmSync(path.join(SKILLS_DIR, skillName), { recursive: true, force: true });
         const blockReasons = result.errors.filter((e: string) => e.startsWith("BLOCKED:")).join("; ");
         notify(`Blocked: ${skillName} — ${blockReasons}`);
@@ -106,16 +120,15 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
   recordActivation(skillName, true);
   const toolMatch = skillName.match(/^(.+?)(?:-guard|-skill|-v\d+|-rev\d+)?$/);
   if (toolMatch) recordDeploymentBaseline(skillName, toolMatch[1]);
+
+  // Rebuild capability tree after deployment
+  try { buildCapabilityTree(); } catch { /* non-critical */ }
+
   notify(`Skill deployed: ${skillName}`);
   return { ok: true, message: `Skill '${skillName}' deployed. Active now.` };
 }
 
-// ─── Plugin definition (P0-1: SDK migration) ───────────────────────────
-//
-// OpenClaw 2026.3.22 uses definePluginEntry from openclaw/plugin-sdk/plugin-entry.
-// The plain-object pattern still loads via the compat shim but emits runtime warnings.
-// We use a try/catch to gracefully degrade: if plugin-sdk is available, use it.
-// If not (e.g., older OpenClaw), fall back to plain object export.
+// ─── Plugin definition ──────────────────────────────────────────────────
 
 function buildPlugin() {
   return {
@@ -141,7 +154,10 @@ function buildPlugin() {
       // Bootstrap .forge/ directory
       ensureForgeDir();
 
-      // ── Startup service ───────────────────────────────────────────
+      // ══════════════════════════════════════════════════════════════
+      // STARTUP SERVICE
+      // ══════════════════════════════════════════════════════════════
+
       api.registerService({
         id: "aceforge-startup",
         start: async () => {
@@ -169,11 +185,10 @@ function buildPlugin() {
           // Test 2: OpenViking health (optional — non-blocking)
           try {
             const vikingStatus = await checkVikingHealth();
-            if (vikingStatus.available) {
-              tests.push(`✅ OpenViking: ${vikingStatus.url}`);
-            } else {
-              tests.push(`⚠️ OpenViking not reachable (optional): ${vikingStatus.url}`);
-            }
+            tests.push(vikingStatus.available
+              ? `✅ OpenViking: ${vikingStatus.url}`
+              : `⚠️ OpenViking not reachable (optional): ${vikingStatus.url}`
+            );
           } catch {
             tests.push("⚠️ OpenViking check skipped");
           }
@@ -187,11 +202,7 @@ function buildPlugin() {
             if (botToken) {
               const res = await fetch(`https://api.telegram.org/bot${botToken}/getMe`);
               const data = await res.json() as { ok: boolean; result?: { username?: string } };
-              if (data.ok) {
-                tests.push(`✅ Telegram bot: @${data.result?.username}`);
-              } else {
-                tests.push("⚠️ Telegram getMe failed");
-              }
+              tests.push(data.ok ? `✅ Telegram bot: @${data.result?.username}` : "⚠️ Telegram getMe failed");
             } else {
               tests.push("⚠️ No Telegram bot token in config");
             }
@@ -199,7 +210,28 @@ function buildPlugin() {
             tests.push(`⚠️ Telegram check failed: ${(err as Error).message}`);
           }
 
+          // Test 4: Adversarial robustness (Phase 3C)
+          try {
+            const advReport = runAdversarialTests();
+            tests.push(advReport.missed === 0
+              ? `✅ Adversarial: ${advReport.caught}/${advReport.totalMutations} mutations caught`
+              : `⚠️ Adversarial: ${advReport.missed} mutations MISSED (${advReport.caught}/${advReport.totalMutations} caught)`
+            );
+          } catch {
+            tests.push("⚠️ Adversarial test skipped");
+          }
+
           expireOldProposals(notify);
+
+          // Phase 2: Build capability tree on startup
+          try { buildCapabilityTree(); } catch { /* non-critical */ }
+          // Phase 2: Merge cross-session patterns on startup
+          try { mergePatterns(); } catch { /* non-critical */ }
+
+          const priorityDomains = getPriorityDomains(0.4);
+          const priorityLine = priorityDomains.length > 0
+            ? `🎯 Priority gaps: ${priorityDomains.map(d => `${d.domain} (${Math.round(d.gapScore * 100)}%)`).join(", ")}`
+            : "";
 
           const dashboard = [
             `AceForge v${version} Online`,
@@ -208,9 +240,10 @@ function buildPlugin() {
             `📈 Patterns: ${patternCount} traced · ${candidateCount} candidates`,
             `🔍 Threshold: ${threshold}x recurrences`,
             `📋 Health: ${healthCount} entries`,
+            priorityLine,
             ``,
             ...tests,
-          ].join("\n");
+          ].filter(Boolean).join("\n");
 
           notify(dashboard).catch((err: Error) =>
             log.error(`[aceforge] startup notification failed: ${err.message}`)
@@ -218,32 +251,65 @@ function buildPlugin() {
         },
       });
 
-      // ── HOOK: before_prompt_build ─────────────────────────────────
+      // ══════════════════════════════════════════════════════════════
+      // HOOKS (infrastructure-enforced)
+      // ══════════════════════════════════════════════════════════════
+
+      // Inject hierarchical skill index before each prompt
       api.on("before_prompt_build", (_event: any, _ctx: any) => {
         const index = buildHierarchicalSkillIndex();
         if (index) return { prependSystemContext: index };
       }, { priority: 50 });
 
-      // ── HOOK: after_tool_call ─────────────────────────────────────
+      // Capture tool traces after each tool call
       api.on("after_tool_call", (event: any, ctx: any) => {
         captureToolTrace(event, ctx, api);
       });
 
-      // ── HOOK: message_received ────────────────────────────────────
+      // Detect correction patterns in incoming messages
       api.on("message_received", (event: any, _ctx: any) => {
         detectCorrectionPatterns(event);
       });
 
-      // ── HOOK: agent_end ───────────────────────────────────────────
+      // After full agent turn: analyze patterns + Phase 2/3 intelligence
       api.on("agent_end", (_event: any, _ctx: any) => {
         resetLlmRateLimit();
-        resetJudgeRateLimit();
+
+        // Phase 1: Core pattern analysis
         analyzePatterns().catch((err: Error) =>
           log.error(`[aceforge] pattern analysis error: ${err.message}`)
         );
+
+        // Phase 2: Cross-session merge + capability tree rebuild
+        try { mergePatterns(); } catch (err) {
+          log.error(`[aceforge] cross-session merge error: ${(err as Error).message}`);
+        }
+        try { buildCapabilityTree(); } catch (err) {
+          log.error(`[aceforge] capability tree error: ${(err as Error).message}`);
+        }
+
+        // Phase 2: Proactive behavior gap detection
+        try {
+          const behaviorGaps = summarizeBehaviorGaps();
+          if (behaviorGaps.length > 0) {
+            const criticalGaps = behaviorGaps.filter(g => g.count >= 5);
+            if (criticalGaps.length > 0) {
+              notify(
+                `Proactive Gap Alert\n` +
+                `${criticalGaps.length} critical behavior gap(s):\n` +
+                criticalGaps.map(g => `${g.domain}: ${g.gapType} (${g.count}x)`).join("\n")
+              ).catch(() => {});
+            }
+          }
+          updateTreeWithBehaviorGaps();
+        } catch (err) {
+          log.error(`[aceforge] behavior gap detection error: ${(err as Error).message}`);
+        }
       });
 
-      // ── TOOLS ─────────────────────────────────────────────────────
+      // ══════════════════════════════════════════════════════════════
+      // TOOLS (agent-callable)
+      // ══════════════════════════════════════════════════════════════
 
       api.registerTool({
         name: "forge",
@@ -264,24 +330,6 @@ function buildPlugin() {
           resetLlmRateLimit();
           await analyzePatterns();
           return { content: [{ type: "text", text: "Reflection complete. Check /forge_status for any new candidates." }] };
-        },
-      });
-
-      api.registerTool({
-        name: "forge_gaps",
-        description: "Detect and report capability gaps from failure patterns, retry storms, and correction clusters.",
-        parameters: { type: "object", properties: {} },
-        async execute(_toolCallId: string, _params: Record<string, unknown>) {
-          const gaps = detectGaps();
-          if (gaps.length === 0) {
-            return { content: [{ type: "text", text: "No capability gaps detected. The agent is performing well across all tools." }] };
-          }
-          const lines: string[] = [`${gaps.length} gap(s) detected:\n`];
-          for (const gap of gaps) {
-            const severityLabel = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
-            lines.push(`${gap.tool} (${severityLabel}): ${gap.gapType.replace(/_/g, " ")} — ${gap.evidence[0] || "no evidence"}`);
-          }
-          return { content: [{ type: "text", text: lines.join("\n") }] };
         },
       });
 
@@ -307,22 +355,7 @@ function buildPlugin() {
           }
           const skillDir = path.join(PROPOSALS_DIR, name);
           fs.mkdirSync(skillDir, { recursive: true });
-
-          const skillMd = `---
-name: ${name}
-description: "${(description as string).replace(/"/g, '\\"')}"
-metadata:
-  openclaw:
-    category: ${category}
-    aceforge:
-      status: proposed
-      proposed: ${new Date().toISOString()}
----
-
-# ${name}
-
-${instructions}
-`;
+          const skillMd = `---\nname: ${name}\ndescription: "${(description as string).replace(/"/g, '\\"')}"\nmetadata:\n  openclaw:\n    category: ${category}\n    aceforge:\n      status: proposed\n      proposed: ${new Date().toISOString()}\n---\n\n# ${name}\n\n${instructions}\n`;
           fs.writeFileSync(path.join(skillDir, "SKILL.md"), skillMd);
           notify(`Proposed new skill: ${name} in ${category}\nPending: /forge_approve ${name}`);
           return { content: [{ type: "text", text: `Proposal saved: ${name}` }] };
@@ -331,12 +364,8 @@ ${instructions}
 
       api.registerTool({
         name: "forge_approve_skill",
-        description: "Approve a proposed skill for deployment. Pass the skill name as the 'name' parameter.",
-        parameters: {
-          type: "object",
-          properties: { name: { type: "string", description: "Name of the proposal to approve" } },
-          required: ["name"]
-        },
+        description: "Approve a proposed skill for deployment.",
+        parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
         async execute(_toolCallId: string, params: Record<string, unknown>) {
           const skillName = (params.name as string || "").trim();
           if (!skillName) return { content: [{ type: "text", text: "Missing skill name." }] };
@@ -347,12 +376,8 @@ ${instructions}
 
       api.registerTool({
         name: "forge_reject_skill",
-        description: "Reject a proposed skill. Pass the skill name as the 'name' parameter.",
-        parameters: {
-          type: "object",
-          properties: { name: { type: "string", description: "Name of the proposal to reject" } },
-          required: ["name"]
-        },
+        description: "Reject a proposed skill.",
+        parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
         async execute(_toolCallId: string, params: Record<string, unknown>) {
           const skillName = (params.name as string || "").trim();
           if (!skillName) return { content: [{ type: "text", text: "Missing skill name." }] };
@@ -366,11 +391,7 @@ ${instructions}
       api.registerTool({
         name: "forge_quality",
         description: "Score a deployed skill's quality against actual usage data.",
-        parameters: {
-          type: "object",
-          properties: { name: { type: "string", description: "Name of the deployed skill to evaluate" } },
-          required: ["name"]
-        },
+        parameters: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
         async execute(_toolCallId: string, params: Record<string, unknown>) {
           const skillName = (params.name as string || "").trim();
           if (!skillName) return { content: [{ type: "text", text: "Missing skill name." }] };
@@ -387,42 +408,79 @@ ${instructions}
         name: "forge_registry",
         description: "Get machine-readable skill registry with success rates and activation counts",
         parameters: { type: "object", properties: {} },
-        async execute(_toolCallId: string, _params: Record<string, unknown>) {
-          const registry = getSkillRegistry();
-          return { content: [{ type: "text", text: JSON.stringify(registry, null, 2) }] };
-        },
+        async execute() { return { content: [{ type: "text", text: JSON.stringify(getSkillRegistry(), null, 2) }] }; },
       });
 
       api.registerTool({
         name: "forge_rewards",
-        description: "Get per-skill success rate signals for RL training integration (MetaClaw/OpenClaw-RL compatible)",
+        description: "Get per-skill success rate signals for RL training integration",
         parameters: { type: "object", properties: {} },
-        async execute(_toolCallId: string, _params: Record<string, unknown>) {
-          const signals = getRewardSignals();
-          return { content: [{ type: "text", text: JSON.stringify(signals, null, 2) }] };
+        async execute() { return { content: [{ type: "text", text: JSON.stringify(getRewardSignals(), null, 2) }] }; },
+      });
+
+      // Phase 2: Capability tree as machine-readable tool
+      api.registerTool({
+        name: "forge_tree",
+        description: "Get the capability tree with gap scores per domain. Use for understanding where the agent needs new skills.",
+        parameters: { type: "object", properties: {} },
+        async execute() {
+          const tree = buildCapabilityTree();
+          return { content: [{ type: "text", text: JSON.stringify(tree, null, 2) }] };
         },
       });
 
-      // L2 fix: forge_status is ONLY a command, not also a tool (was duplicate registration)
+      // Phase 2: Gap detection as standalone tool
+      api.registerTool({
+        name: "forge_gaps",
+        description: "Detect capability gaps from failure patterns, corrections, and behavior analysis.",
+        parameters: { type: "object", properties: {} },
+        async execute() {
+          const gaps = detectGaps();
+          const behaviorGaps = summarizeBehaviorGaps();
+          const crossSession = getCrossSessionCandidates();
+          let text = "";
+          if (gaps.length > 0) {
+            text += `Tool Gaps (${gaps.length}):\n`;
+            for (const g of gaps.slice(0, 5)) {
+              text += `  ${g.tool}: ${g.gapType} (severity ${g.severity})\n`;
+            }
+            text += "\n";
+          }
+          if (behaviorGaps.length > 0) {
+            text += `Behavior Gaps (${behaviorGaps.length}):\n`;
+            for (const bg of behaviorGaps.slice(0, 5)) {
+              text += `  ${bg.domain}: ${bg.gapType} (${bg.count}x)\n`;
+            }
+            text += "\n";
+          }
+          if (crossSession.length > 0) {
+            text += `Cross-Session Candidates (${crossSession.length}):\n`;
+            for (const cs of crossSession.slice(0, 5)) {
+              text += `  ${cs.tool}: ${cs.detail}\n`;
+            }
+          }
+          if (!text) text = "No gaps detected.";
+          return { content: [{ type: "text", text }] };
+        },
+      });
 
-      // ── SLASH COMMANDS ────────────────────────────────────────────
+      // ══════════════════════════════════════════════════════════════
+      // SLASH COMMANDS
+      // ══════════════════════════════════════════════════════════════
+
+      // ── Phase 1 commands (preserved from v0.6.1) ──────────────────
 
       api.registerCommand({
-        name: "forge_approve",
-        description: "Approve a proposed skill for deployment",
-        acceptsArgs: true,
+        name: "forge_approve", description: "Approve a proposed skill for deployment", acceptsArgs: true,
         handler: async (ctx: any) => {
           const name = ctx.args?.trim();
           if (!name) return { text: "Usage: /forge_approve <skill-name>" };
-          const result = await validateAndDeploy(name);
-          return { text: result.message };
+          return { text: (await validateAndDeploy(name)).message };
         }
       });
 
       api.registerCommand({
-        name: "forge_reject",
-        description: "Reject a proposed skill",
-        acceptsArgs: true,
+        name: "forge_reject", description: "Reject a proposed skill", acceptsArgs: true,
         handler: async (ctx: any) => {
           const name = ctx.args?.trim();
           if (!name) return { text: "Usage: /forge_reject <skill-name>" };
@@ -434,23 +492,20 @@ ${instructions}
       });
 
       api.registerCommand({
-        name: "forge_retire",
-        description: "Retire an active skill",
-        acceptsArgs: true,
+        name: "forge_retire", description: "Retire an active skill", acceptsArgs: true,
         handler: async (ctx: any) => {
           const name = ctx.args?.trim();
           if (!name) return { text: "Usage: /forge_retire <skill-name>" };
           const done = retireSkill(name);
           if (!done) return { text: `Skill '${name}' not found.` };
           notify(`Skill retired: ${name}`);
+          try { buildCapabilityTree(); } catch { /* rebuild tree */ }
           return { text: `Skill '${name}' retired.` };
         }
       });
 
       api.registerCommand({
-        name: "forge_reinstate",
-        description: "Reinstate a retired skill",
-        acceptsArgs: true,
+        name: "forge_reinstate", description: "Reinstate a retired skill", acceptsArgs: true,
         handler: async (ctx: any) => {
           const name = ctx.args?.trim();
           if (!name) return { text: "Usage: /forge_reinstate <skill-name>" };
@@ -462,9 +517,7 @@ ${instructions}
       });
 
       api.registerCommand({
-        name: "forge_status",
-        description: "Show AceForge status dashboard",
-        acceptsArgs: false,
+        name: "forge_status", description: "Show AceForge status dashboard", acceptsArgs: false,
         handler: async (_ctx: any) => {
           const active = listActiveSkills();
           const proposals = listProposals();
@@ -478,12 +531,16 @@ ${instructions}
           text += `📈 Patterns: ${patternCount} traced · ${candidateCount} candidates\n`;
           text += `🔍 Threshold: ${threshold}x recurrences\n`;
 
-          // OpenViking status (non-blocking)
+          // OpenViking status
           try {
             const vikingStatus = await checkVikingHealth();
             text += `🔮 OpenViking: ${vikingStatus.available ? "connected" : "not reachable"} (${vikingStatus.url})\n`;
-          } catch {
-            text += `🔮 OpenViking: check failed\n`;
+          } catch { text += `🔮 OpenViking: check failed\n`; }
+
+          // Phase 2: Priority domains from capability tree
+          const priority = getPriorityDomains(0.4);
+          if (priority.length > 0) {
+            text += `🎯 Priority gaps: ${priority.map(d => `${d.domain} (${Math.round(d.gapScore * 100)}%)`).join(", ")}\n`;
           }
 
           text += `\n`;
@@ -492,27 +549,20 @@ ${instructions}
             text += `Active (${active.length}):\n`;
             for (const name of active) {
               const stats = getSkillStats(name);
-              if (stats.activations > 0) {
-                const days = stats.daysSinceActivation ?? "?";
-                text += `  ${name}: ${stats.activations} acts, ${Math.round(stats.successRate * 100)}% succ (${days}d ago)\n`;
-              } else {
-                text += `  ${name}: no activations yet\n`;
-              }
+              text += stats.activations > 0
+                ? `  ${name}: ${stats.activations} acts, ${Math.round(stats.successRate * 100)}% succ (${stats.daysSinceActivation ?? "?"}d ago)\n`
+                : `  ${name}: no activations yet\n`;
             }
           }
 
           if (proposals.length > 0) {
             text += `\nProposals (${proposals.length}):\n`;
-            for (const name of proposals) {
-              text += `  ${name}: /forge_approve ${name}\n`;
-            }
+            for (const name of proposals) text += `  ${name}: /forge_approve ${name}\n`;
           }
 
           if (retired.length > 0) {
             text += `\nRetired (${retired.length}):\n`;
-            for (const name of retired) {
-              text += `  ${name}: /forge_reinstate ${name}\n`;
-            }
+            for (const name of retired) text += `  ${name}: /forge_reinstate ${name}\n`;
           }
 
           return { text };
@@ -520,87 +570,61 @@ ${instructions}
       });
 
       api.registerCommand({
-        name: "forge_list",
-        description: "List all managed skills, proposals, and retired skills",
-        acceptsArgs: false,
+        name: "forge_list", description: "List all managed skills, proposals, and retired skills", acceptsArgs: false,
         handler: async (_ctx: any) => {
           const active = listActiveSkills();
           const proposals = listProposals();
           const retired = listRetiredSkills();
           let text = "AceForge Inventory\n\n";
-          text += `Active (${active.length}):\n`;
-          text += active.length === 0 ? "  none\n" : active.map(s => `  ✓ ${s}`).join("\n") + "\n";
-          text += `\nProposals (${proposals.length}):\n`;
-          text += proposals.length === 0 ? "  none\n" : proposals.map(s => `  ◌ ${s}`).join("\n") + "\n";
-          text += `\nRetired (${retired.length}):\n`;
-          text += retired.length === 0 ? "  none\n" : retired.map(s => `  ✗ ${s}`).join("\n") + "\n";
+          text += `Active (${active.length}):\n${active.length === 0 ? "  none\n" : active.map(s => `  ✓ ${s}`).join("\n") + "\n"}`;
+          text += `\nProposals (${proposals.length}):\n${proposals.length === 0 ? "  none\n" : proposals.map(s => `  ◌ ${s}`).join("\n") + "\n"}`;
+          text += `\nRetired (${retired.length}):\n${retired.length === 0 ? "  none\n" : retired.map(s => `  ✗ ${s}`).join("\n") + "\n"}`;
           return { text };
         }
       });
 
       api.registerCommand({
-        name: "forge_gaps",
-        description: "Show detected capability gaps from failure patterns and corrections",
-        acceptsArgs: false,
+        name: "forge_gaps", description: "Show detected capability gaps", acceptsArgs: false,
         handler: async (_ctx: any) => {
           const gaps = detectGaps();
-          if (gaps.length === 0) return { text: "No capability gaps detected. The agent is performing well across all tools." };
-
-          let text = `AceForge Gap Analysis\n\n`;
-          text += `${gaps.length} capability gap${gaps.length === 1 ? "" : "s"} detected:\n\n`;
-
+          if (gaps.length === 0) return { text: "No capability gaps detected." };
+          let text = `AceForge Gap Analysis\n\n${gaps.length} gap(s):\n\n`;
           for (const gap of gaps) {
-            const severityLabel = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
-            text += `${gap.tool} (${severityLabel})\n`;
-            text += `  Type: ${gap.gapType.replace(/_/g, " ")}\n`;
-            text += `  ${gap.evidence.slice(0, 2).join("\n  ")}\n`;
-            text += `  Focus: ${gap.suggestedFocus}\n\n`;
+            const sev = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
+            text += `${gap.tool} (${sev})\n  Type: ${gap.gapType.replace(/_/g, " ")}\n  ${gap.evidence.slice(0, 2).join("\n  ")}\n\n`;
           }
-
-          text += `Generate remediation proposals: /forge_gap_propose`;
           return { text };
         }
       });
 
       api.registerCommand({
-        name: "forge_gap_propose",
-        description: "Generate remediation skill proposals for detected gaps",
-        acceptsArgs: false,
+        name: "forge_gap_propose", description: "Generate remediation proposals for gaps", acceptsArgs: false,
         handler: async (_ctx: any) => {
           const gaps = detectGaps();
           if (gaps.length === 0) return { text: "No gaps to address." };
           resetLlmRateLimit();
           await analyzePatterns();
-          return { text: `Gap analysis triggered. ${gaps.length} gaps evaluated. Check /forge_status for proposals.` };
+          return { text: `${gaps.length} gaps evaluated. Check /forge_status for proposals.` };
         }
       });
 
       api.registerCommand({
-        name: "forge_watchdog",
-        description: "Check skill effectiveness — flags underperforming or degraded skills",
-        acceptsArgs: false,
+        name: "forge_watchdog", description: "Check skill effectiveness", acceptsArgs: false,
         handler: async (_ctx: any) => {
           const alerts = runEffectivenessWatchdog();
-          if (alerts.length === 0) return { text: "All deployed skills are performing at or above baseline. No issues detected." };
-
-          let text = `Skill Effectiveness Report\n\n`;
-          text += `${alerts.length} skill(s) flagged:\n\n`;
+          if (alerts.length === 0) return { text: "All skills performing at or above baseline." };
+          let text = `Effectiveness Report\n\n${alerts.length} flagged:\n\n`;
           for (const a of alerts) {
-            const icon = a.reason === "degraded" ? "🔴" : "🟡";
-            text += `${icon} ${a.skill}\n`;
-            text += `  ${a.reason === "no_improvement"
-              ? `No improvement: ${Math.round(a.successRate * 100)}% success vs ${Math.round(a.baselineRate * 100)}% baseline after ${a.activations} activations`
-              : `Degraded: ${Math.round(a.successRate * 100)}% success over ${a.activations} activations`}\n\n`;
+            text += `${a.reason === "degraded" ? "🔴" : "🟡"} ${a.skill}: ${a.reason === "no_improvement"
+              ? `${Math.round(a.successRate * 100)}% vs ${Math.round(a.baselineRate * 100)}% baseline (${a.activations} acts)`
+              : `${Math.round(a.successRate * 100)}% success (${a.activations} acts)`}\n`;
           }
-          text += `Actions: /forge_retire <name> to retire, or wait for the evolution cycle.`;
           return { text };
         }
       });
 
       api.registerCommand({
-        name: "forge_quality",
-        description: "Score a skill's quality against actual usage data",
-        acceptsArgs: true,
+        name: "forge_quality", description: "Score a skill's quality", acceptsArgs: true,
         handler: async (ctx: any) => {
           const skillName = ctx.args?.trim();
           if (!skillName) return { text: "Usage: /forge_quality <skill-name>" };
@@ -608,80 +632,98 @@ ${instructions}
           if (!fs.existsSync(skillFile)) return { text: `Skill '${skillName}' not found.` };
           const skillMd = fs.readFileSync(skillFile, "utf-8");
           const toolName = skillName.replace(/-(guard|skill|v\d+|rev\d+|upgrade)$/, "");
-          const report = scoreSkill(skillMd, toolName);
-          return { text: formatQualityReport(report, skillName) };
+          return { text: formatQualityReport(scoreSkill(skillMd, toolName), skillName) };
         }
       });
 
       api.registerCommand({
-        name: "forge_upgrade",
-        description: "Deploy an upgrade proposal, retiring the old skill",
-        acceptsArgs: true,
+        name: "forge_upgrade", description: "Deploy upgrade proposal, retire old skill", acceptsArgs: true,
         handler: async (ctx: any) => {
           const oldName = ctx.args?.trim();
           if (!oldName) return { text: "Usage: /forge_upgrade <skill-name>" };
-
           const upgradeName = oldName + "-upgrade";
           const upgradeDir = path.join(PROPOSALS_DIR, upgradeName);
-          if (!fs.existsSync(upgradeDir)) {
-            return { text: `No upgrade proposal found for '${oldName}'. Run /forge_quality ${oldName} first.` };
-          }
-
-          // Retire old skill
-          const oldDir = path.join(SKILLS_DIR, oldName);
-          if (fs.existsSync(oldDir)) {
-            retireSkill(oldName);
-            notify(`Skill retired for upgrade: ${oldName}`);
-          }
-
-          // Deploy upgrade under the ORIGINAL name
+          if (!fs.existsSync(upgradeDir)) return { text: `No upgrade proposal for '${oldName}'.` };
+          if (fs.existsSync(path.join(SKILLS_DIR, oldName))) { retireSkill(oldName); }
           const targetDir = path.join(SKILLS_DIR, oldName);
           fs.mkdirSync(targetDir, { recursive: true });
-          for (const file of fs.readdirSync(upgradeDir)) {
-            fs.copyFileSync(path.join(upgradeDir, file), path.join(targetDir, file));
-          }
+          for (const file of fs.readdirSync(upgradeDir)) fs.copyFileSync(path.join(upgradeDir, file), path.join(targetDir, file));
           fs.rmSync(upgradeDir, { recursive: true, force: true });
-
           recordActivation(oldName, true);
           const toolMatch = oldName.match(/^(.+?)(?:-guard|-skill|-v\d+|-rev\d+)?$/);
           if (toolMatch) recordDeploymentBaseline(oldName, toolMatch[1]);
-
-          notify(`Skill upgraded: ${oldName}\nOld version retired. New version active.`);
-          return { text: `Skill '${oldName}' upgraded. Old version retired, new version deployed.` };
+          notify(`Skill upgraded: ${oldName}`);
+          try { buildCapabilityTree(); } catch {}
+          return { text: `Skill '${oldName}' upgraded.` };
         }
       });
 
-      // G4: Rollback command — restores old skill version after a failed upgrade
       api.registerCommand({
-        name: "forge_rollback",
-        description: "Roll back an upgrade — retire current version and reinstate the previous one from retired/",
-        acceptsArgs: true,
+        name: "forge_rollback", description: "Roll back upgrade — reinstate previous version", acceptsArgs: true,
         handler: async (ctx: any) => {
           const name = ctx.args?.trim();
           if (!name) return { text: "Usage: /forge_rollback <skill-name>" };
-
-          const currentDir = path.join(SKILLS_DIR, name);
           const retiredDir = path.join(FORGE_DIR, "retired", name);
-
-          if (!fs.existsSync(retiredDir)) {
-            return { text: `No retired version of '${name}' found. Nothing to roll back to.` };
-          }
-
-          // Remove current version
-          if (fs.existsSync(currentDir)) {
-            fs.rmSync(currentDir, { recursive: true, force: true });
-          }
-
-          // Reinstate from retired
+          if (!fs.existsSync(retiredDir)) return { text: `No retired version of '${name}'.` };
+          if (fs.existsSync(path.join(SKILLS_DIR, name))) fs.rmSync(path.join(SKILLS_DIR, name), { recursive: true, force: true });
           const done = reinstateSkill(name);
           if (!done) return { text: `Rollback failed for '${name}'.` };
-
-          notify(`Skill rolled back: ${name}\nPrevious version reinstated.`);
-          return { text: `Skill '${name}' rolled back to previous version.` };
+          notify(`Skill rolled back: ${name}`);
+          return { text: `Skill '${name}' rolled back.` };
         }
       });
 
-      log.info("[aceforge] all hooks, tools, and commands registered");
+      // ── Phase 2 commands ──────────────────────────────────────────
+
+      api.registerCommand({
+        name: "forge_tree", description: "Display capability tree with gap scores per domain", acceptsArgs: false,
+        handler: async (_ctx: any) => { return { text: formatCapabilityTree() }; }
+      });
+
+      api.registerCommand({
+        name: "forge_cross_session", description: "Show cross-session pattern analysis", acceptsArgs: false,
+        handler: async (_ctx: any) => { return { text: formatCrossSessionReport() }; }
+      });
+
+      api.registerCommand({
+        name: "forge_compose", description: "Show skill co-activation patterns and composition candidates", acceptsArgs: false,
+        handler: async (_ctx: any) => { return { text: formatCompositionReport() }; }
+      });
+
+      api.registerCommand({
+        name: "forge_behavior_gaps", description: "Show proactive behavior gap analysis (fallback/deferral/uncertainty)", acceptsArgs: false,
+        handler: async (_ctx: any) => { return { text: formatBehaviorGapReport() }; }
+      });
+
+      api.registerCommand({
+        name: "forge_optimize", description: "Run description optimization — check skill descriptions vs conversation language", acceptsArgs: false,
+        handler: async (_ctx: any) => { return { text: formatOptimizationReport() }; }
+      });
+
+      // ── Phase 3 commands ──────────────────────────────────────────
+
+      api.registerCommand({
+        name: "forge_test", description: "Run health tests on all deployed skills (verify CLIs, paths, endpoints)", acceptsArgs: false,
+        handler: async (_ctx: any) => {
+          const results = await runAllHealthTests();
+          return { text: formatHealthTestReport(results) };
+        }
+      });
+
+      api.registerCommand({
+        name: "forge_challenge", description: "Generate grounded challenge scenarios from Viking/pattern data", acceptsArgs: false,
+        handler: async (_ctx: any) => {
+          const challenges = await generateChallenges();
+          return { text: formatChallengeReport(challenges) };
+        }
+      });
+
+      api.registerCommand({
+        name: "forge_adversarial", description: "Run adversarial mutation tests against the validator", acceptsArgs: false,
+        handler: async (_ctx: any) => { return { text: formatAdversarialReport() }; }
+      });
+
+      log.info("[aceforge] v0.7.0 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
     }
   };
 }
