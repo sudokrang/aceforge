@@ -396,9 +396,13 @@ export async function analyzePatterns(): Promise<void> {
 
     if (successRate < SUCCESS_RATE_MIN) continue;
 
-    // Require 2+ distinct sessions — single-session bursts are noise
-    if (sessions.size < 2) {
-      console.log(`[aceforge] skipping ${key} — only ${sessions.size} session(s), need 2+`);
+    // Require temporal spread — reject concentrated bursts, accept organic usage
+    // Signal: 2+ sessions OR 2+ distinct days OR 2+ distinct hours with gaps
+    // A build burst is 10 calls in 5 min. Organic usage spans hours.
+    const distinctDays = new Set(entries.map(e => new Date(e.ts).toISOString().slice(0, 10))).size;
+    const distinctHours = new Set(entries.map(e => new Date(e.ts).toISOString().slice(0, 13))).size;
+    if (sessions.size < 2 && distinctDays < 2 && distinctHours < 2) {
+      console.log(`[aceforge] skipping ${key} — concentrated burst (${sessions.size} sess, ${distinctDays} days, ${distinctHours} hrs)`);
       continue;
     }
 
