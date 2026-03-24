@@ -1,159 +1,243 @@
-<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
-<rect width="1280" height="720" fill="#1a1a2e"/>
+<svg width="1280" height="900" viewBox="0 0 1280 900" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" style="stop-color:#0d1117"/>
+    <stop offset="100%" style="stop-color:#161b22"/>
+  </linearGradient>
+</defs>
+
+<rect width="1280" height="900" fill="url(#bgGrad)"/>
 
 <!-- Title -->
-<text x="640" y="40" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="500" fill="#e8e6df">AceForge architecture</text>
+<text x="640" y="36" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="18" font-weight="600" fill="#e6edf3" letter-spacing="0.5">AceForge Architecture — Phase 1 + 2 + 3</text>
 
-<!-- ═══ Row 1: Pattern Capture ═══ -->
-<rect x="80" y="70" width="1120" height="100" rx="12" fill="#2a2a4a" stroke="#534AB7" stroke-width="0.5" opacity="0.4"/>
-<text x="640" y="95" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#AFA9EC">Pattern capture layer</text>
+<!-- ═══ PHASE 1: Core Engine ═══ -->
+<rect x="30" y="55" width="1220" height="440" rx="10" fill="none" stroke="#30363d" stroke-width="1" opacity="0.5"/>
+<text x="50" y="76" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#7F77DD" letter-spacing="1">PHASE 1 — CORE ENGINE</text>
 
-<rect x="120" y="110" width="160" height="44" rx="8" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="200" y="137" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#CECBF6">after_tool_call</text>
+<!-- Row 1: Pattern Capture -->
+<rect x="60" y="90" width="1160" height="75" rx="8" fill="#161b22" stroke="#30363d" stroke-width="0.5"/>
+<text x="640" y="110" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#8b949e">Pattern Capture Layer</text>
 
-<rect x="320" y="110" width="160" height="44" rx="8" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="400" y="137" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#CECBF6">message_received</text>
+<rect x="90" y="118" width="130" height="36" rx="6" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="155" y="140" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#CECBF6">after_tool_call</text>
 
-<rect x="520" y="110" width="160" height="44" rx="8" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="600" y="137" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#CECBF6">agent_end</text>
+<rect x="240" y="118" width="130" height="36" rx="6" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="305" y="140" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#CECBF6">message_received</text>
 
-<rect x="720" y="110" width="160" height="44" rx="8" fill="#04342C" stroke="#5DCAA5" stroke-width="0.5"/>
-<text x="800" y="137" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#9FE1CB">patterns.jsonl</text>
+<rect x="390" y="118" width="130" height="36" rx="6" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="455" y="140" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#CECBF6">agent_end</text>
 
-<rect x="920" y="110" width="240" height="44" rx="8" fill="#04342C" stroke="#5DCAA5" stroke-width="0.5"/>
-<text x="1040" y="130" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#9FE1CB">Traces: tool, args, result,</text>
-<text x="1040" y="147" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#5DCAA5">success, session, corrections</text>
+<text x="550" y="140" font-family="system-ui,sans-serif" font-size="14" fill="#5DCAA5" opacity="0.6">→</text>
 
-<!-- Arrows row 1 -->
-<line x1="280" y1="132" x2="318" y2="132" stroke="#5DCAA5" stroke-width="1" opacity="0.5"/>
-<line x1="480" y1="132" x2="518" y2="132" stroke="#5DCAA5" stroke-width="1" opacity="0.5"/>
-<line x1="680" y1="132" x2="718" y2="132" stroke="#5DCAA5" stroke-width="1" opacity="0.5"/>
-<line x1="880" y1="132" x2="918" y2="132" stroke="#5DCAA5" stroke-width="1" opacity="0.5"/>
+<rect x="580" y="118" width="160" height="36" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="660" y="140" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#9FE1CB">patterns.jsonl</text>
 
-<!-- ═══ Arrow down to Row 2 ═══ -->
-<line x1="640" y1="170" x2="640" y2="200" stroke="#7F77DD" stroke-width="1.5" opacity="0.6"/>
-<polygon points="633,197 640,207 647,197" fill="#7F77DD" opacity="0.6"/>
+<text x="770" y="140" font-family="system-ui,sans-serif" font-size="14" fill="#5DCAA5" opacity="0.6">→</text>
 
-<!-- ═══ Row 2: Analysis + Candidate Detection ═══ -->
-<rect x="280" y="210" width="300" height="80" rx="12" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="430" y="238" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#CECBF6">analyze.ts</text>
-<text x="430" y="258" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#AFA9EC">Group by tool + args prefix</text>
-<text x="430" y="275" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#AFA9EC">Threshold: 3x (5x at 20+ skills)</text>
+<rect x="800" y="118" width="180" height="36" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="890" y="133" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#9FE1CB">tool · args · result · success</text>
+<text x="890" y="147" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#5DCAA5">session · corrections · chains</text>
 
-<rect x="700" y="210" width="300" height="80" rx="12" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="850" y="238" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#CECBF6">candidates.jsonl</text>
-<text x="850" y="258" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#AFA9EC">Tool, occurrences, success rate</text>
-<text x="850" y="275" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#AFA9EC">Distinct sessions, first/last seen</text>
+<!-- Arrow down -->
+<line x1="640" y1="165" x2="640" y2="185" stroke="#7F77DD" stroke-width="1" opacity="0.4"/>
+<polygon points="636,183 640,190 644,183" fill="#7F77DD" opacity="0.4"/>
 
-<line x1="580" y1="250" x2="698" y2="250" stroke="#5DCAA5" stroke-width="1.5" opacity="0.5"/>
-<polygon points="695,244 705,250 695,256" fill="#5DCAA5" opacity="0.5"/>
+<!-- Row 2: Analysis -->
+<rect x="200" y="192" width="280" height="62" rx="8" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="340" y="216" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#CECBF6">analyze.ts</text>
+<text x="340" y="234" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Group by tool · Threshold: 3x (5x at 20+)</text>
+<text x="340" y="246" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Evolution → Upgrade → New proposal paths</text>
 
-<!-- ═══ Arrow down to Row 3 ═══ -->
-<line x1="640" y1="290" x2="640" y2="320" stroke="#7F77DD" stroke-width="1.5" opacity="0.6"/>
-<polygon points="633,317 640,327 647,317" fill="#7F77DD" opacity="0.6"/>
+<text x="505" y="225" font-family="system-ui,sans-serif" font-size="14" fill="#5DCAA5" opacity="0.6">→</text>
 
-<!-- ═══ Row 3: Dual-Model LLM Pipeline ═══ -->
-<rect x="120" y="330" width="1040" height="120" rx="12" fill="none" stroke="#EF9F27" stroke-width="1" stroke-dasharray="6 3" opacity="0.4"/>
-<text x="640" y="352" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#EF9F27" opacity="0.7">Dual-model LLM pipeline (provider-agnostic)</text>
+<rect x="530" y="192" width="280" height="62" rx="8" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="670" y="216" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" font-weight="500" fill="#CECBF6">candidates.jsonl</text>
+<text x="670" y="234" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Tool, occurrences, success rate</text>
+<text x="670" y="246" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Sessions, workflow chains, gap candidates</text>
 
-<rect x="160" y="365" width="280" height="70" rx="10" fill="#412402" stroke="#EF9F27" stroke-width="0.5"/>
-<text x="300" y="392" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#FAC775">Generator</text>
-<text x="300" y="412" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#EF9F27">Default: MiniMax M2.7</text>
-<text x="300" y="427" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#BA7517">Any OpenAI-compatible /chat/completions</text>
+<!-- Arrow down -->
+<line x1="640" y1="254" x2="640" y2="274" stroke="#7F77DD" stroke-width="1" opacity="0.4"/>
+<polygon points="636,272 640,279 644,272" fill="#7F77DD" opacity="0.4"/>
 
-<rect x="500" y="365" width="280" height="70" rx="10" fill="#26215C" stroke="#AFA9EC" stroke-width="0.5"/>
-<text x="640" y="392" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#CECBF6">Reviewer</text>
-<text x="640" y="412" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#AFA9EC">Default: DeepSeek Reasoner</text>
-<text x="640" y="427" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#7F77DD">APPROVE / REVISE / REJECT with CoT</text>
+<!-- Row 3: Dual-Model LLM Pipeline -->
+<rect x="80" y="280" width="1100" height="80" rx="8" fill="none" stroke="#EF9F27" stroke-width="0.8" stroke-dasharray="4 3" opacity="0.4"/>
+<text x="640" y="298" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#EF9F27" opacity="0.6">Dual-Model LLM Pipeline (provider-agnostic · any OpenAI-compatible API)</text>
 
-<rect x="840" y="365" width="280" height="70" rx="10" fill="#4A1B0C" stroke="#F0997B" stroke-width="0.5"/>
-<text x="980" y="392" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#F5C4B3">Template fallback</text>
-<text x="980" y="412" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#F0997B">generator.ts</text>
-<text x="980" y="427" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#D85A30">Used when LLM APIs fail</text>
+<rect x="120" y="306" width="240" height="44" rx="6" fill="#2a1a00" stroke="#EF9F27" stroke-width="0.5"/>
+<text x="240" y="325" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#FAC775">Generator</text>
+<text x="240" y="341" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#BA7517">Default: MiniMax M2.7</text>
 
-<!-- Arrows between LLM boxes -->
-<line x1="440" y1="400" x2="498" y2="400" stroke="#EF9F27" stroke-width="1.5" opacity="0.5"/>
-<polygon points="495,394 505,400 495,406" fill="#EF9F27" opacity="0.5"/>
-<line x1="780" y1="400" x2="838" y2="400" stroke="#F0997B" stroke-width="1" opacity="0.3" stroke-dasharray="4 3"/>
-<polygon points="835,394 845,400 835,406" fill="#F0997B" opacity="0.3"/>
+<text x="380" y="330" font-family="system-ui,sans-serif" font-size="14" fill="#EF9F27" opacity="0.5">→</text>
 
-<!-- ═══ Arrow down to Row 4 ═══ -->
-<line x1="640" y1="450" x2="640" y2="480" stroke="#7F77DD" stroke-width="1.5" opacity="0.6"/>
-<polygon points="633,477 640,487 647,477" fill="#7F77DD" opacity="0.6"/>
+<rect x="400" y="306" width="240" height="44" rx="6" fill="#1c2128" stroke="#AFA9EC" stroke-width="0.5"/>
+<text x="520" y="325" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#CECBF6">Reviewer</text>
+<text x="520" y="341" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#7F77DD">Default: DeepSeek Reasoner · CoT</text>
 
-<!-- ═══ Row 4: Security + Approval + Deploy ═══ -->
-<rect x="140" y="490" width="220" height="60" rx="10" fill="#501313" stroke="#F09595" stroke-width="0.5"/>
-<text x="250" y="515" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#F7C1C1">validator.ts</text>
-<text x="250" y="533" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#F09595">Injection, credentials, paths, similarity</text>
+<text x="660" y="330" font-family="system-ui,sans-serif" font-size="14" fill="#8b949e" opacity="0.4">→</text>
 
-<rect x="410" y="490" width="220" height="60" rx="10" fill="#085041" stroke="#5DCAA5" stroke-width="0.5"/>
-<text x="520" y="515" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#9FE1CB">Human approval</text>
-<text x="520" y="533" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#5DCAA5">Telegram / Slack / log notification</text>
+<rect x="680" y="306" width="200" height="44" rx="6" fill="#1c2128" stroke="#8b949e" stroke-width="0.5" opacity="0.6"/>
+<text x="780" y="325" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#8b949e">LLM Judge</text>
+<text x="780" y="341" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#484f58">Score 40-70 → semantic eval</text>
 
-<rect x="680" y="490" width="220" height="60" rx="10" fill="#04342C" stroke="#1D9E75" stroke-width="1"/>
-<text x="790" y="515" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#9FE1CB">Deploy skill</text>
-<text x="790" y="533" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#5DCAA5">~/.openclaw/workspace/skills/</text>
+<rect x="900" y="306" width="200" height="44" rx="6" fill="#2a1508" stroke="#F0997B" stroke-width="0.5" opacity="0.6"/>
+<text x="1000" y="325" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#F5C4B3">Template fallback</text>
+<text x="1000" y="341" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#D85A30">When LLM APIs fail</text>
 
-<rect x="950" y="490" width="220" height="60" rx="10" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="1060" y="515" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="500" fill="#CECBF6">lifecycle.ts</text>
-<text x="1060" y="533" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#AFA9EC">Quality, health, effectiveness</text>
+<!-- Arrow down -->
+<line x1="640" y1="360" x2="640" y2="378" stroke="#7F77DD" stroke-width="1" opacity="0.4"/>
+<polygon points="636,376 640,383 644,376" fill="#7F77DD" opacity="0.4"/>
 
-<!-- Arrows row 4 -->
-<line x1="360" y1="520" x2="408" y2="520" stroke="#5DCAA5" stroke-width="1.5" opacity="0.5"/>
-<polygon points="405,514 415,520 405,526" fill="#5DCAA5" opacity="0.5"/>
-<line x1="630" y1="520" x2="678" y2="520" stroke="#1D9E75" stroke-width="1.5" opacity="0.6"/>
-<polygon points="675,514 685,520 675,526" fill="#1D9E75" opacity="0.6"/>
-<line x1="900" y1="520" x2="948" y2="520" stroke="#7F77DD" stroke-width="1" opacity="0.4"/>
-<polygon points="945,514 955,520 945,526" fill="#7F77DD" opacity="0.4"/>
+<!-- Row 4: Validate → Approve → Deploy → Lifecycle -->
+<rect x="100" y="385" width="190" height="48" rx="6" fill="#2a1010" stroke="#F09595" stroke-width="0.5"/>
+<text x="195" y="406" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#F7C1C1">validator.ts</text>
+<text x="195" y="422" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">19 adversarial mutations · SOUL.md detect</text>
 
-<!-- ═══ Arrow down to Row 5 ═══ -->
-<line x1="640" y1="550" x2="640" y2="580" stroke="#7F77DD" stroke-width="1.5" opacity="0.6"/>
-<polygon points="633,577 640,587 647,577" fill="#7F77DD" opacity="0.6"/>
+<text x="310" y="410" font-family="system-ui,sans-serif" font-size="14" fill="#5DCAA5" opacity="0.5">→</text>
 
-<!-- ═══ Row 5: Evolution + Context Injection ═══ -->
-<rect x="200" y="590" width="300" height="70" rx="12" fill="#412402" stroke="#EF9F27" stroke-width="0.5"/>
-<text x="350" y="618" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#FAC775">Skill evolution</text>
-<text x="350" y="638" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#EF9F27">50+ new traces -> revise (not rewrite)</text>
-<text x="350" y="653" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#BA7517">reviseSkillWithLLm()</text>
+<rect x="330" y="385" width="190" height="48" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="425" y="406" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#9FE1CB">Human Approval</text>
+<text x="425" y="422" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Telegram · Slack · log</text>
 
-<rect x="560" y="590" width="260" height="70" rx="12" fill="#04342C" stroke="#5DCAA5" stroke-width="1"/>
-<text x="690" y="618" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#9FE1CB">before_prompt_build</text>
-<text x="690" y="638" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#5DCAA5">Metadata-only skill injection</text>
-<text x="690" y="653" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#1D9E75">skill/index.ts</text>
+<text x="540" y="410" font-family="system-ui,sans-serif" font-size="14" fill="#1D9E75" opacity="0.6">→</text>
 
-<rect x="880" y="590" width="240" height="70" rx="12" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="1000" y="618" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="500" fill="#CECBF6">Cron reflection</text>
-<text x="1000" y="638" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#AFA9EC">Every 6 hours autonomous</text>
-<text x="1000" y="653" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#7F77DD">forge_reflect</text>
+<rect x="560" y="385" width="190" height="48" rx="6" fill="#0d2818" stroke="#1D9E75" stroke-width="0.8"/>
+<text x="655" y="406" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#9FE1CB">Deploy Skill</text>
+<text x="655" y="422" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">~/.openclaw/workspace/skills/</text>
 
-<!-- Evolution feedback arrow (curved back to pipeline) -->
-<path d="M350 590 Q350 560 300 540 Q200 500 160 440 Q140 410 160 380 Q170 365 200 365" fill="none" stroke="#EF9F27" stroke-width="1" stroke-dasharray="4 3" opacity="0.4"/>
-<text x="110" y="465" font-family="system-ui,sans-serif" font-size="9" fill="#EF9F27" opacity="0.5" transform="rotate(-90,110,465)">revision loop</text>
+<text x="770" y="410" font-family="system-ui,sans-serif" font-size="14" fill="#7F77DD" opacity="0.4">→</text>
 
-<!-- Cron arrow back to analysis -->
-<path d="M1000 590 Q1000 560 1060 540 Q1120 500 1120 400 Q1120 320 1060 300 Q1000 280 850 290" fill="none" stroke="#7F77DD" stroke-width="1" stroke-dasharray="4 3" opacity="0.3"/>
+<rect x="790" y="385" width="190" height="48" rx="6" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="885" y="406" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#CECBF6">lifecycle.ts</text>
+<text x="885" y="422" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e">Quality · Health · A/B · Watchdog</text>
 
-<!-- ═══ Side: External connections ═══ -->
-<!-- OpenViking -->
-<rect x="20" y="210" width="160" height="50" rx="8" fill="#2a2a4a" stroke="#534AB7" stroke-width="0.5" opacity="0.6"/>
-<text x="100" y="232" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="500" fill="#AFA9EC">OpenViking</text>
-<text x="100" y="248" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#7F77DD">127.0.0.1:1933</text>
-<line x1="180" y1="235" x2="278" y2="250" stroke="#534AB7" stroke-width="0.5" opacity="0.3" stroke-dasharray="3 3"/>
+<!-- Row 5: Evolution + Context Injection -->
+<rect x="120" y="450" width="220" height="36" rx="6" fill="#2a1a00" stroke="#EF9F27" stroke-width="0.5" opacity="0.7"/>
+<text x="230" y="472" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#FAC775">Skill Evolution (50+ traces)</text>
 
-<!-- Notify channel -->
-<rect x="20" y="500" width="100" height="40" rx="8" fill="#085041" stroke="#5DCAA5" stroke-width="0.5" opacity="0.5"/>
-<text x="70" y="524" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#9FE1CB">notify.ts</text>
-<line x1="120" y1="520" x2="138" y2="520" stroke="#5DCAA5" stroke-width="0.5" opacity="0.4"/>
+<rect x="380" y="450" width="220" height="36" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.8"/>
+<text x="490" y="472" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#9FE1CB">before_prompt_build</text>
+
+<rect x="640" y="450" width="220" height="36" rx="6" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5" opacity="0.7"/>
+<text x="750" y="472" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#CECBF6">Effectiveness Watchdog</text>
+
+<!-- Evolution feedback arrow -->
+<path d="M230 450 Q230 440 200 430 Q140 410 120 380 Q100 350 120 320 Q130 308 160 308" fill="none" stroke="#EF9F27" stroke-width="0.8" stroke-dasharray="3 2" opacity="0.3"/>
+<text x="85" y="380" font-family="system-ui,sans-serif" font-size="8" fill="#EF9F27" opacity="0.4" transform="rotate(-90,85,380)">revision loop</text>
+
+<!-- ═══ PHASE 2: Proactive Intelligence ═══ -->
+<rect x="30" y="510" width="600" height="200" rx="10" fill="none" stroke="#30363d" stroke-width="1" opacity="0.5"/>
+<text x="50" y="531" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#5DCAA5" letter-spacing="1">PHASE 2 — PROACTIVE INTELLIGENCE</text>
+
+<rect x="50" y="542" width="170" height="40" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="135" y="558" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#9FE1CB">Capability Tree</text>
+<text x="135" y="572" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Gap scoring per domain</text>
+
+<rect x="235" y="542" width="170" height="40" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="320" y="558" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#9FE1CB">Cross-Session</text>
+<text x="320" y="572" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Pattern propagation</text>
+
+<rect x="420" y="542" width="170" height="40" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="505" y="558" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#9FE1CB">Composition</text>
+<text x="505" y="572" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Co-activation → DAG</text>
+
+<rect x="50" y="595" width="170" height="40" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="135" y="611" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#9FE1CB">Proactive Gaps</text>
+<text x="135" y="625" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Fallback · Deferral · Uncertainty</text>
+
+<rect x="235" y="595" width="170" height="40" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="320" y="611" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#9FE1CB">Description Optimizer</text>
+<text x="320" y="625" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Token overlap analysis</text>
+
+<rect x="420" y="595" width="170" height="40" rx="6" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="505" y="611" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#9FE1CB">Auto-Adjust</text>
+<text x="505" y="625" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#5DCAA5">Micro-revisions from corrections</text>
+
+<!-- Phase 2 trigger label -->
+<text x="315" y="660" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e" opacity="0.6">Triggered on every agent_end via setImmediate (non-blocking)</text>
+
+<!-- Arrow from Phase 1 to Phase 2 -->
+<path d="M455 486 Q455 498 350 508" fill="none" stroke="#5DCAA5" stroke-width="1" opacity="0.3"/>
+
+<!-- ═══ PHASE 3: Self-Validation ═══ -->
+<rect x="650" y="510" width="600" height="200" rx="10" fill="none" stroke="#30363d" stroke-width="1" opacity="0.5"/>
+<text x="670" y="531" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#F09595" letter-spacing="1">PHASE 3 — SELF-VALIDATION</text>
+
+<rect x="670" y="542" width="170" height="56" rx="6" fill="#2a1010" stroke="#F09595" stroke-width="0.5"/>
+<text x="755" y="561" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#F7C1C1">Health Tests</text>
+<text x="755" y="575" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">CLI: which · Paths: existsSync</text>
+<text x="755" y="587" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">Endpoints: HEAD · Tools: registry</text>
+
+<rect x="855" y="542" width="170" height="56" rx="6" fill="#2a1010" stroke="#F09595" stroke-width="0.5"/>
+<text x="940" y="561" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#F7C1C1">Grounded Challenges</text>
+<text x="940" y="575" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">Viking context scenarios</text>
+<text x="940" y="587" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">Pattern-based fallback</text>
+
+<rect x="1040" y="542" width="170" height="56" rx="6" fill="#2a1010" stroke="#F09595" stroke-width="0.5"/>
+<text x="1125" y="561" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="500" fill="#F7C1C1">Adversarial Suite</text>
+<text x="1125" y="575" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">19 mutation variants</text>
+<text x="1125" y="587" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#F09595">Runs at startup</text>
+
+<!-- Test results badge -->
+<rect x="780" y="615" width="200" height="28" rx="14" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.8"/>
+<text x="880" y="634" text-anchor="middle" font-family="'SF Mono',monospace" font-size="10" font-weight="500" fill="#5DCAA5">346 tests · 19/19 adversarial</text>
+
+<!-- Arrow from Phase 1 to Phase 3 -->
+<path d="M825 486 Q825 498 890 508" fill="none" stroke="#F09595" stroke-width="1" opacity="0.3"/>
+
+<!-- ═══ External Integrations ═══ -->
+<rect x="30" y="730" width="1220" height="80" rx="10" fill="none" stroke="#30363d" stroke-width="1" opacity="0.5"/>
+<text x="50" y="751" font-family="system-ui,sans-serif" font-size="12" font-weight="600" fill="#8b949e" letter-spacing="1">INTEGRATIONS</text>
+
+<rect x="60" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="135" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">OpenViking</text>
+<text x="135" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Context engine · Circuit breaker</text>
+
+<rect x="230" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="305" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">MetaClaw / RL</text>
+<text x="305" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">forge_registry · forge_rewards</text>
+
+<rect x="400" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="475" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">ClawHub</text>
+<text x="475" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Dedup check before proposing</text>
+
+<rect x="570" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="645" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">Notifications</text>
+<text x="645" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Telegram · Slack · log</text>
+
+<rect x="740" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="815" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">Any LLM Provider</text>
+<text x="815" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">OpenAI · MiniMax · DeepSeek · Local</text>
+
+<rect x="910" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="985" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">All Channels</text>
+<text x="985" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Telegram · Slack · Discord · iMessage</text>
+
+<rect x="1080" y="762" width="150" height="36" rx="6" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+<text x="1155" y="778" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" font-weight="500" fill="#AFA9EC">Skill Index</text>
+<text x="1155" y="791" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">before_prompt_build · 3K tokens</text>
 
 <!-- Legend -->
-<rect x="40" y="680" width="12" height="12" rx="2" fill="#26215C" stroke="#7F77DD" stroke-width="0.5"/>
-<text x="60" y="691" font-family="system-ui,sans-serif" font-size="10" fill="#9c9a92">Core modules</text>
-<rect x="180" y="680" width="12" height="12" rx="2" fill="#412402" stroke="#EF9F27" stroke-width="0.5"/>
-<text x="200" y="691" font-family="system-ui,sans-serif" font-size="10" fill="#9c9a92">LLM pipeline</text>
-<rect x="320" y="680" width="12" height="12" rx="2" fill="#04342C" stroke="#5DCAA5" stroke-width="0.5"/>
-<text x="340" y="691" font-family="system-ui,sans-serif" font-size="10" fill="#9c9a92">Data + deployment</text>
-<rect x="480" y="680" width="12" height="12" rx="2" fill="#501313" stroke="#F09595" stroke-width="0.5"/>
-<text x="500" y="691" font-family="system-ui,sans-serif" font-size="10" fill="#9c9a92">Security</text>
-<line x1="620" y1="686" x2="660" y2="686" stroke="#EF9F27" stroke-width="1" stroke-dasharray="4 3" opacity="0.5"/>
-<text x="670" y="691" font-family="system-ui,sans-serif" font-size="10" fill="#9c9a92">Feedback loop</text>
+<g transform="translate(60,840)">
+  <rect width="10" height="10" rx="2" fill="#1c2128" stroke="#7F77DD" stroke-width="0.5"/>
+  <text x="16" y="9" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Core modules</text>
+
+  <rect x="120" width="10" height="10" rx="2" fill="#2a1a00" stroke="#EF9F27" stroke-width="0.5"/>
+  <text x="136" y="9" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">LLM pipeline</text>
+
+  <rect x="240" width="10" height="10" rx="2" fill="#0d2818" stroke="#5DCAA5" stroke-width="0.5"/>
+  <text x="256" y="9" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Data + intelligence</text>
+
+  <rect x="380" width="10" height="10" rx="2" fill="#2a1010" stroke="#F09595" stroke-width="0.5"/>
+  <text x="396" y="9" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Security + validation</text>
+
+  <rect x="540" width="10" height="10" rx="2" fill="#1c2128" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="556" y="9" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Integrations</text>
+
+  <line x1="660" y1="5" x2="690" y2="5" stroke="#EF9F27" stroke-width="1" stroke-dasharray="3 2" opacity="0.5"/>
+  <text x="696" y="9" font-family="system-ui,sans-serif" font-size="9" fill="#8b949e">Feedback loop</text>
+</g>
+
+<!-- Footer -->
+<text x="640" y="880" text-anchor="middle" font-family="system-ui,sans-serif" font-size="9" fill="#484f58">AceForge v0.7.4 · sudokrang/aceforge · MIT License</text>
 </svg>

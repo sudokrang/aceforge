@@ -2,358 +2,334 @@
   <img src="assets/banner.svg" alt="AceForge" width="100%">
 </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![OpenClaw](https://img.shields.io/badge/OpenClaw-Plugin-orange)](https://openclaw.ai) [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Version](https://img.shields.io/badge/version-0.7.0-green)](https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md)
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://openclaw.ai"><img src="https://img.shields.io/badge/OpenClaw-Plugin-orange" alt="OpenClaw Plugin"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript"></a>
+  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.7.4-green" alt="Version"></a>
+  <img src="https://img.shields.io/badge/tests-346%2F346-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/adversarial-19%2F19-brightgreen" alt="Adversarial">
+</p>
 
-**A self-evolving skill engine for [OpenClaw](https://openclaw.ai) agents.**
+<p align="center">
+  <strong>A self-evolving skill engine for <a href="https://openclaw.ai">OpenClaw</a> agents.</strong>
+</p>
 
-AceForge watches how your agent actually works — what tools it calls, what fails, what you correct — and turns those patterns into permanent skills. It generates skills through a dual-model LLM pipeline, validates them for security, scores existing skills against your real usage data, and proposes upgrades when a skill isn't serving you well. Nothing deploys without your approval.
-
-**v0.7.0** adds **proactive intelligence** (capability tree, cross-session learning, skill composition, behavior gap detection, description optimization, autonomous adjustment) and **self-validation** (health testing, grounded challenges, adversarial robustness testing). Every feature is grounded in peer-reviewed research.
-
----
-
-## Quick Demo
-
-```
-📱 Notification:
-
-New Skill Proposal
-server-operations
-Tool: exec
-12x, 83% success, 4 sessions
-Summary: SSH into production and staging servers for log inspection and service restarts
-Use: /forge_approve server-operations  or  /forge_reject server-operations
-
-> /forge_approve server-operations
-✅ Skill 'server-operations' deployed. Active now.
-```
-
-```
-📱 Notification:
-
-Skill Upgrade Proposal
-exec-operations-upgrade (replaces exec-operations)
-Current score: 36/100
-Issues: No anti-patterns section; covers 18% of argument patterns; 8 failures unaddressed
-Use: /forge_upgrade exec-operations  or  /forge_reject exec-operations-upgrade
-```
-
-```
-> /forge_tree
-🔴 MONITORING — gap: 55%
-  Skills: bitaxe-hashrate
-  Activations: 31 | Success: 90%
-  Events: 14 total, 8 failures/fallbacks
-
-🟡 COMMUNICATION — gap: 38%
-  Skills: channel-digest-formatter
-  Activations: 12 | Success: 83%
-
-🟢 OPERATIONS — gap: 15%
-  Skills: exec-operations, netsuite-query
-  Activations: 147 | Success: 82%
-
-Priority targets for skill generation:
-  → monitoring: 55% gap score
-```
+<p align="center">
+  AceForge watches how your agent works — what tools it calls, what fails, what you correct — and turns<br>
+  those patterns into permanent, auditable, human-approved skills. Nothing deploys without your approval.
+</p>
 
 ---
 
-## What AceForge Is
+## Table of Contents
 
-AceForge is the **skill generation and lifecycle layer** for OpenClaw agents. It sits between your agent's raw tool usage and its permanent skill library, doing what no other plugin does: converting observed behavior into externalized, auditable, human-approved SKILL.md files.
+- [Why AceForge Exists](#why-aceforge-exists)
+- [How It Works](#how-it-works)
+- [Phase 1: Core Engine](#phase-1-core-engine)
+- [Phase 2: Proactive Intelligence](#phase-2-proactive-intelligence)
+- [Phase 3: Self-Validation](#phase-3-self-validation)
+- [Security](#security)
+- [Commands](#commands)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [RL & Ecosystem Integration](#rl--ecosystem-integration)
+- [Research Basis](#research-basis)
+- [Contributing](#contributing)
+- [License](#license)
 
-This is a problem that matters. Research shows that **56% of agent skills are never invoked** because their descriptions don't match how users actually phrase requests ([SkillsBench, arXiv:2602.12670](https://arxiv.org/abs/2602.12670)). Community skill marketplaces have a **pronounced supply-demand imbalance** with many low-effort skills that underserve users ([Ling et al., arXiv:2602.08004](https://arxiv.org/abs/2602.08004)). And bad skills don't just fail to help — **16 of 84 benchmark tasks showed negative performance deltas** from poor skills ([SkillsBench](https://arxiv.org/abs/2602.12670)).
+---
 
-AceForge solves this by generating skills from data, not guesswork, and continuously evaluating whether those skills are actually working.
+## Why AceForge Exists
 
-## What AceForge Is Not
+Agent skill libraries have a quality problem. Research tells us that **56% of agent skills are never invoked** because their descriptions don't match how users actually phrase requests ([SkillsBench, arXiv:2602.12670](https://arxiv.org/abs/2602.12670)). Community skill marketplaces have a pronounced supply-demand imbalance, with many low-effort skills that underserve users ([Ling et al., arXiv:2602.08004](https://arxiv.org/abs/2602.08004)). And bad skills don't just fail to help — **16 of 84 benchmark tasks showed negative performance** from poor skills ([SkillsBench](https://arxiv.org/abs/2602.12670)). Meanwhile, the [ClawHavoc campaign](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/) exposed **1,184 malicious skills** across ClawHub, targeting agent identity files for persistence attacks.
 
-- **Not a replacement for hand-written skills.** If you've carefully authored a skill that scores well against your usage patterns, AceForge leaves it alone.
+AceForge addresses these problems by generating skills from real operational data — not templates, not guesswork — and continuously validating that those skills actually work, stay relevant, and remain secure.
+
+### What AceForge Is
+
+AceForge is the **skill generation and lifecycle layer** for OpenClaw agents. It sits between your agent's raw tool usage and its permanent skill library, converting observed behavior into externalized, auditable SKILL.md files through a research-grounded dual-model LLM pipeline.
+
+### What AceForge Is Not
+
 - **Not auto-deploying.** Every proposed skill, upgrade, and retirement requires human approval.
-- **Not a context engine.** AceForge generates skills via hooks; it doesn't own the context pipeline. It's compatible with OpenViking, lossless-claw, or the built-in legacy engine.
-- **Not ClawHub-hostile.** If a ClawHub skill serves your agent well, AceForge won't replace it. It only proposes upgrades when trace data shows the skill is underperforming.
-- **Not a fine-tuning system.** Skills are externalized artifacts — inspectable, editable, shareable, auditable. Not model weights.
+- **Not a context engine.** Compatible with OpenViking, lossless-claw, or OpenClaw's built-in engine. AceForge generates skills; it doesn't own context.
+- **Not ClawHub-hostile.** If a ClawHub skill serves your agent well, AceForge leaves it alone. It only proposes upgrades when trace data shows the skill is underperforming.
+- **Not a fine-tuning system.** Skills are externalized artifacts — inspectable, editable, shareable, version-controlled. Not model weights.
 
 ---
 
-## The Full Pipeline
+## How It Works
+
+AceForge operates as a 12-stage pipeline that runs continuously alongside your agent:
 
 ```
   1. Observe          2. Detect             3. Generate
-  after_tool_call     Group by tool+args    Generator (MiniMax M2.7)
-  Traces: tool,       Threshold: 3x (5x    Reviewer (DeepSeek Reasoner)
+  after_tool_call     Group by tool         Generator LLM
+  Traces: tool,       Threshold: 3x (5x    Reviewer LLM (CoT)
   args, result,       at 20+ skills)        APPROVE / REVISE / REJECT
   corrections                                       ↓
   4. Validate         5. Score              6. Approve
-  Injection scan      Structural (0-100)    Telegram / Slack / log
-  Credential check    Coverage (0-100)      /forge_approve
-  Path traversal      LLM judge (40-70)     /forge_upgrade
-  Jaccard+bigram      Rate-limited          /forge_reject
-  ClawHub dedup       Persistent                    ↓
-  SOUL.md detection                                 ↓
+  19 attack checks    Structural (0-100)    Telegram / Slack / log
+  SOUL.md detection   Coverage (0-100)      /forge approve <n>
+  Credential scan     LLM judge (40-70)     /forge reject <n>
+  Path traversal                                    ↓
   7. Deploy           8. Evolve             9. Retire
   skills/ directory   50+ new traces →      Watchdog flags
-  Effectiveness       revise, not rewrite   A/B compares versions
-  baseline recorded   Data-driven updates   Underperformers flagged
-                      /forge_rollback       /forge_retire
+  Baseline recorded   revise, not rewrite   A/B compares versions
+  Token-budgeted      Data-driven updates   Underperformers flagged
                               ↓
   10. Propagate       11. Compose           12. Validate
-  Cross-session       Co-activation →       Health tests (CLI/path/URL)
-  pattern merge       composed skills       Grounded challenges
-  Capability tree     DAG-ordered flow      Adversarial mutations
-  Description opt     /forge_compose        /forge_adversarial
+  Cross-session       Co-activation         Health tests (CLI/path/URL)
+  Capability tree     detection for         Grounded challenges
+  Description opt     future composition    Adversarial mutations
 ```
 
-### What Each Stage Does
-
-1. **Observe** — Every tool call is logged: arguments, results, success/failure, session context, timing. Corrections from you (e.g., "no, actually...") are captured separately. Multi-tool chains (3+ tools within 60s) are detected and logged with sequence order. Session tool history is persisted to disk so chain detection survives restarts.
-
-2. **Detect** — Patterns are grouped by tool. When a tool crosses the crystallization threshold (3x occurrences, escalating to 5x at 20+ skills to prevent library bloat — validated by [Single-Agent scaling, arXiv:2601.04748](https://arxiv.org/abs/2601.04748)), it becomes a candidate. Skill activation matching uses name-prefix comparison.
-
-3. **Generate** — A dual-model LLM pipeline produces the SKILL.md. The generator (default: MiniMax M2.7) writes from real trace data with structured progressive disclosure ([SkillsBench](https://arxiv.org/abs/2602.12670) found focused skills with 2–3 modules outperform comprehensive documentation). An independent reviewer (default: DeepSeek Reasoner) critiques it with Chain of Thought. REVISE triggers one retry. REJECT skips entirely. Rate-limited to prevent API spam during batch analysis (2s interval, 8 calls/cycle max).
-
-4. **Validate** — Before you ever see a proposal, it's checked for prompt injection patterns, credential leaks, path traversal, Jaccard+bigram similarity against existing skills (95%+ blocked), ClawHub dedup, and **SOUL.md/MEMORY.md write detection** (the primary [ClawHavoc](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/) attack vector). Given that ClawHavoc exposed **1,184 malicious skills** across ClawHub ([Antiy CERT](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/)), this layer is non-negotiable.
-
-5. **Score** — When a skill already exists for a tool, AceForge doesn't skip it blindly. It scores the existing skill on structural quality and coverage against your actual trace data. Scores below 60 trigger upgrade proposals. Ambiguous scores (40–70) invoke an LLM judge for semantic evaluation.
-
-6. **Approve** — You get a notification (Telegram, Slack, or log) with a one-command approve/reject.
-
-7. **Deploy** — Approved skills go into `~/.openclaw/workspace/skills/` and are injected via `before_prompt_build` as metadata-only context. A deployment baseline is recorded for effectiveness tracking.
-
-8. **Evolve** — After 50+ new traces post-deployment, skills are **revised** (not rewritten) using only the new data. Based on [SE-Agent, arXiv:2508.02085](https://arxiv.org/abs/2508.02085) trajectory-level revision.
-
-9. **Retire** — The effectiveness watchdog flags skills that haven't improved over pre-deployment baselines after 50 activations, or degraded below 50% success. Based on [IoT-SkillsBench, arXiv:2603.19583](https://arxiv.org/abs/2603.19583).
-
-10. **Propagate** (v0.7.0) — Cross-session pattern aggregation merges tool usage across Telegram, Slack, iMessage, Discord, cron, and CLI sessions. Patterns that recur across 3+ sessions become high-priority candidates. The capability tree organizes skills by domain with gap scores, surfacing where the agent needs improvement. Based on [Memento-Skills, arXiv:2603.18743](https://arxiv.org/abs/2603.18743) Read-Write Reflective Learning.
-
-11. **Compose** (v0.7.0) — When two skills co-activate in >50% of sessions, AceForge proposes a composed skill that chains them with DAG-ordered data flow. Based on [AgentSkillOS, arXiv:2603.02176](https://arxiv.org/abs/2603.02176) — DAG orchestration substantially outperforms flat invocation.
-
-12. **Validate** (v0.7.0) — Deployed skills are health-tested: CLI commands checked via `which`, file paths checked via `existsSync`, API endpoints checked via HEAD request. Grounded challenges generate realistic test scenarios from Viking context or pattern data. Adversarial mutation testing verifies the validator catches all 15 attack variants. Based on [EvoSkill, arXiv:2603.02766](https://arxiv.org/abs/2603.02766).
+Every stage is grounded in peer-reviewed research. See [Research Basis](#research-basis) for the full citation table.
 
 ---
 
-## Phase 2: Proactive Intelligence (v0.7.0)
+## Phase 1: Core Engine
+
+The foundation: observe tool usage, detect patterns, generate skills, validate for security, and manage the full lifecycle.
+
+### Observation & Pattern Detection
+
+Every tool call your agent makes is logged with full context: arguments, results, success/failure, session identifier, timing, and duration. Corrections from you (phrases like "no, actually..." or "that's wrong") are captured separately and linked to the nearest tool call by temporal proximity.
+
+Multi-tool chains — 3+ distinct tools called within 60 seconds — are detected automatically and logged with sequence order. Session tool history persists to disk, so chain detection survives gateway restarts.
+
+When a tool crosses the crystallization threshold (3x occurrences, escalating to 5x at 20+ deployed skills to prevent library bloat), it becomes a generation candidate.
+
+**Design intent:** The escalating threshold implements the diminishing returns finding from [Single-Agent scaling (arXiv:2601.04748)](https://arxiv.org/abs/2601.04748) — more skills don't always help, and eventually selection quality degrades. AceForge gates quantity to preserve quality.
+
+### Dual-Model LLM Pipeline
+
+Skill generation uses two independent LLMs working in sequence:
+
+1. **Generator** (default: MiniMax M2.7) writes the SKILL.md from real trace data — actual arguments, actual failures, actual corrections. The prompt enforces progressive disclosure structure (When to Use → Pre-flight → Instructions → Error Recovery → Anti-Patterns) based on [SkillsBench](https://arxiv.org/abs/2602.12670)'s finding that focused skills with 2-3 modules outperform comprehensive documentation.
+
+2. **Reviewer** (default: DeepSeek Reasoner) critiques the generated skill with Chain of Thought reasoning. It evaluates trigger precision, instruction specificity, anti-pattern grounding, and security. Verdict: APPROVE, REVISE (one retry), or REJECT.
+
+Both models are provider-agnostic — any OpenAI-compatible `/chat/completions` endpoint works. Rate-limited to 8 calls per cycle with 2-second intervals.
+
+**Design intent:** The proposer/judge dual-model loop is validated by [Multi-Agent Evolve (arXiv:2510.23595)](https://arxiv.org/abs/2510.23595). Independent review with structured criteria (not open-ended judging) delivers 8-11% accuracy improvement per [DeepVerifier (arXiv:2601.15808)](https://arxiv.org/abs/2601.15808).
+
+### Quality Scoring & Hybrid LLM Judge
+
+When a skill already exists for a tool, AceForge doesn't skip it. It scores the existing skill on two dimensions:
+
+**Structural quality (40% weight):** Trigger clarity, progressive disclosure sections, procedural depth, anti-pattern grounding, conciseness, metadata completeness, security hygiene. Pure text analysis — no LLM calls, runs in milliseconds.
+
+**Coverage (60% weight):** Argument pattern coverage vs. your actual traces, failure coverage vs. your observed errors, correction coverage vs. your user fixes, usage recency, success improvement since deployment.
+
+| Combined Score | Action | Method |
+|---|---|---|
+| **< 40** | Auto-propose upgrade | Deterministic only (zero LLM cost) |
+| **40–70** | LLM judge evaluates | Hybrid: 50% deterministic + 50% semantic |
+| **> 70** | Leave it alone | Skill is adequate |
+
+**Design intent:** The hybrid approach reserves expensive LLM calls for genuinely ambiguous cases. The 40-70 "ambiguous zone" is where deterministic scoring can't confidently decide, so the reviewer LLM provides semantic evaluation against actual trace samples.
+
+### Skill Evolution
+
+After 50+ new traces accumulate since deployment, AceForge **revises** existing skills rather than regenerating from scratch. The revision prompt includes only the new data — new success patterns, new failures, new corrections — and instructs the generator to preserve what works while updating what doesn't.
+
+**Design intent:** Trajectory-level revision outperforms full regeneration per [SE-Agent (arXiv:2508.02085)](https://arxiv.org/abs/2508.02085). Skills accumulate operational wisdom over time rather than losing it to rewrites.
+
+### Three Analysis Paths
+
+Every `agent_end` cycle evaluates tools through three explicit paths:
+
+1. **Evolution** — Deployed skill with 50+ new traces → revise with new data
+2. **Upgrade** — Deployed skill scoring below 60 → propose a replacement
+3. **New proposal** — No existing skill → generate from scratch
+
+This ensures no tool falls through the cracks regardless of its deployment state.
+
+---
+
+## Phase 2: Proactive Intelligence
+
+Phase 2 runs on every `agent_end` hook via `setImmediate` (non-blocking). Six modules work together to identify where the agent needs improvement, propagate learning across sessions, and autonomously adjust skills from corrections.
 
 ### Capability Tree
 
-AceForge organizes all skills into a hierarchical capability tree with gap scoring per domain. Gap score = fallback_events / total_events. High gap score = domain where the agent frequently can't handle tasks well.
+All skills are organized into a hierarchical capability tree with gap scoring per domain. Gap score = (fallback events + behavior gaps) / total events. Domains with gap score > 0.4 surface as priority targets for skill generation.
 
-```
-> /forge_tree
-🔴 MONITORING — gap: 55%
-  Skills: bitaxe-hashrate
-  Activations: 31 | Success: 90%
-  Events: 14 total, 8 failures/fallbacks
+The tree rebuilds on every `agent_end` and after every skill deployment. Domains are classified by keyword matching against tool names and argument patterns: operations, monitoring, communication, infrastructure, development, analysis.
 
-🟢 OPERATIONS — gap: 15%
-  Skills: exec-operations, netsuite-query
-  Activations: 147 | Success: 82%
-
-Priority targets for skill generation:
-  → monitoring: 55% gap score
-```
-
-Domains with gap_score > 0.4 surface in `/forge_status` as priority targets for skill generation. The tree rebuilds on every `agent_end` hook and after every skill deployment.
-
-Based on [AgentSkillOS (arXiv:2603.02176)](https://arxiv.org/abs/2603.02176): recursive categorization into capability tree; tree-based retrieval effectively approximates oracle skill selection at 200K+ skills.
+**Design intent:** [AgentSkillOS (arXiv:2603.02176)](https://arxiv.org/abs/2603.02176) demonstrates that tree-based retrieval effectively approximates oracle skill selection at 200K+ skills. AceForge implements this at the organizational level to surface where the agent's capabilities are strongest and weakest.
 
 ### Cross-Session Pattern Propagation
 
-Single-session analysis misses patterns that span Telegram + Slack + iMessage + cron. AceForge merges tool usage across all sessions to surface global recurring patterns:
+Single-session analysis misses patterns that span Telegram + Slack + iMessage + Discord + cron jobs. AceForge merges tool usage across all sessions to surface global recurring patterns:
 
-- **Cross-session tool stats**: total usage, unique sessions, success rate, common args/errors
-- **Cross-session corrections**: systematic mistakes that repeat across channels
-- **Cross-session chains**: workflow sequences (e.g., `exec→read→write`) that recur across 3+ sessions
+- **Cross-session tool stats** — total usage, unique sessions, success rate, common arguments and errors
+- **Cross-session corrections** — systematic user corrections that repeat across channels
+- **Cross-session chains** — workflow sequences (e.g., `exec→read→write`) that recur across 3+ sessions
 
-Based on [Memento-Skills (arXiv:2603.18743)](https://arxiv.org/abs/2603.18743): skills as persistent evolving memory; Read-Write Reflective Learning enables carrying forward knowledge across interactions.
+Patterns recurring across 3+ sessions become high-priority crystallization candidates.
 
-### Skill Composition
+**Design intent:** [Memento-Skills (arXiv:2603.18743)](https://arxiv.org/abs/2603.18743) models skills as persistent evolving memory with a Read-Write Reflective Learning loop. Cross-session propagation implements the "read" phase — carrying forward knowledge gained in one interaction context to inform all future contexts.
 
-When two skills co-activate in >50% of sessions across 5+ sessions, AceForge detects the co-activation pattern and proposes a composed skill that chains them:
+### Skill Composition Detection
 
-- The composed skill specifies DAG-ordered data flow between steps
-- Output of skill A feeds input of skill B
-- Error handling is specified per step
+When two skills co-activate in >50% of sessions across 5+ sessions, AceForge detects the co-activation pattern and reports it as a composition candidate. The detection uses per-session tool matching against active skill prefixes.
 
-Based on [AgentSkillOS (arXiv:2603.02176)](https://arxiv.org/abs/2603.02176): DAG-based pipelines substantially outperform native flat invocation even with identical skill sets.
+**Design intent:** [AgentSkillOS (arXiv:2603.02176)](https://arxiv.org/abs/2603.02176) found that DAG-based pipelines substantially outperform flat invocation even with identical skill sets. AceForge's composition detection identifies the candidates; DAG orchestration is the target for future composition generation.
 
 ### Proactive Gap Detection
 
-On every `agent_end`, AceForge detects four behavior patterns that indicate capability gaps:
+On every `agent_end`, AceForge analyzes pattern data for four behavior categories that indicate capability gaps:
 
 | Pattern | What It Detects | Example |
 |---|---|---|
 | **Fallback** | Agent can't perform a task | "I can't do that" / "you'll need to manually" |
 | **Deferral** | Agent asks permission when it should act | "let me know if you want me to..." |
-| **Uncertainty** | Agent lacks confidence before tool calls | "I think" / "I'm not sure" |
+| **Uncertainty** | Agent lacks confidence | "I think" / "I'm not sure" |
 | **Infrastructure** | Missing tools or access | "requires installation" / "not found" |
 
-Each detection increments the relevant domain's gap_score in the capability tree. Critical gaps (5+ occurrences) trigger notifications.
+Each detection increments the relevant domain's gap score in the capability tree. Critical gaps (5+ occurrences) trigger notifications.
 
-Based on [EvoSkill (arXiv:2603.02766)](https://arxiv.org/abs/2603.02766): failure-driven skill discovery via the Proposer agent analyzing failure traces and suggesting skill improvements.
+**Design intent:** [EvoSkill (arXiv:2603.02766)](https://arxiv.org/abs/2603.02766) demonstrates failure-driven skill discovery through a Proposer agent that analyzes failure traces and suggests improvements. AceForge implements this as continuous passive monitoring rather than active probing.
 
 ### Description Optimization
 
-A weekly optimization pass compares each skill's description against actual conversation language using token overlap. Skills with <30% overlap are flagged for rewrite — ensuring skills stay findable as your language evolves.
+Periodically compares each skill's description against actual conversation language using token overlap analysis. Skills with <30% overlap between their trigger description and how you actually phrase related requests are flagged — because description IS the discovery mechanism.
 
-Based on [SkillsBench (arXiv:2602.12670)](https://arxiv.org/abs/2602.12670): 56% of skills never invoked because descriptions don't match user intent. The description IS the discovery mechanism.
+**Design intent:** [SkillsBench (arXiv:2602.12670)](https://arxiv.org/abs/2602.12670) found that 56% of skills are never invoked because descriptions don't match user intent. This module ensures skills stay findable as your language evolves over time.
 
 ### Autonomous Skill Adjustment
 
-When corrections are detected, AceForge matches them to the active skill and applies micro-revisions immediately (no approval needed):
+When corrections are detected, AceForge matches them to the active skill by temporal proximity and applies micro-revisions immediately (no approval needed):
 
-- **Anti-pattern append**: "When using X, use Y (not Z)"
-- **Instruction addendum**: adds a note to the instructions section
-- **Correction log**: HTML comment with correction context
+- **Anti-pattern append** — "User correction for `exec`: use --rm flag (original: docker run nginx)"
+- **Instruction addendum** — adds a note to the instructions section
+- **Correction log** — HTML comment with full correction context
 
 After 3+ micro-revisions in 30 days, AceForge triggers a full LLM rewrite proposal (with approval).
 
-Based on [Memento-Skills (arXiv:2603.18743)](https://arxiv.org/abs/2603.18743) write phase: the agent updates and expands its skill library based on new experience.
+**Design intent:** [Memento-Skills (arXiv:2603.18743)](https://arxiv.org/abs/2603.18743) write phase — the agent updates and expands its skill library based on new experience. Micro-revisions are the fast path; full rewrites are the deliberate path.
 
 ---
 
-## Phase 3: Self-Validation (v0.7.0)
+## Phase 3: Self-Validation
+
+Three modules that ensure deployed skills actually work, generate realistic test scenarios, and verify the security validator itself.
 
 ### Skill Health Testing
 
-Periodic validation that installed skills still work:
+Periodic validation that installed skills reference real, working infrastructure:
 
-- **CLI commands**: Extracted from SKILL.md → verified via `which` (e.g., `ssh`, `docker`, `git`)
-- **File paths**: Extracted from backtick references → verified via `existsSync`
-- **API endpoints**: Extracted from URLs → health-checked via HEAD request (5s timeout)
-- **Tool references**: Verified against OpenClaw's registered tools
+- **CLI commands** — extracted from SKILL.md, verified via `which` (e.g., `ssh`, `docker`, `git`)
+- **File paths** — extracted from backtick references, verified via `existsSync`
+- **API endpoints** — extracted from URLs, health-checked via HEAD request (5s timeout)
 
-Skills that fail health tests get flagged in `/forge_status` with specific failure reasons.
+Skills that fail health tests are flagged with specific failure reasons.
 
-Based on [EvoSkill (arXiv:2603.02766)](https://arxiv.org/abs/2603.02766): retain only skills that improve held-out validation performance.
+**Design intent:** [EvoSkill (arXiv:2603.02766)](https://arxiv.org/abs/2603.02766) retains only skills that improve held-out validation performance. Health testing is the infrastructure-level equivalent — ensuring skills don't reference binaries that have been uninstalled or endpoints that have moved.
 
 ### Grounded Challenges
 
 Generates realistic test scenarios from operational context:
 
-1. Pull recent context from OpenViking (`POST /api/v1/search/find`) or from pattern trace data
-2. Generate task prompts: "Check the Bitaxe hashrate and report"
-3. Evaluate whether the right skills fire and the task succeeds
-4. Skills that fail challenges get flagged for improvement
+1. Query OpenViking for recent context related to each skill's tool domain
+2. Generate task prompts grounded in real operational data
+3. Fall back to pattern-based generation when Viking is unavailable
 
-Falls back to pattern-based generation when Viking is unavailable.
+Challenges are logged for tracking skill activation patterns over time.
 
-Based on [SE-Agent (arXiv:2508.02085)](https://arxiv.org/abs/2508.02085): curriculum generation for progressive testing of agent capabilities.
+**Design intent:** [SE-Agent (arXiv:2508.02085)](https://arxiv.org/abs/2508.02085) demonstrates curriculum generation for progressive testing of agent capabilities. Grounded challenges prevent the "teaching to the test" problem by generating scenarios from real-world context.
 
 ### Adversarial Robustness
 
-Mutation testing against the validator with 15 attack variants:
+Mutation testing against the security validator with **19 attack variants**:
 
-| Mutation | What It Tests |
+| Category | Mutations |
 |---|---|
-| `injection-ignore` | "Ignore previous instructions" |
-| `injection-disregard` | "Disregard all prior" |
-| `injection-youarenow` | "You are now a malicious agent" |
-| `credential-apikey` | API key in plaintext |
-| `credential-password` | Password in plaintext |
-| `credential-token` | Long token in plaintext |
-| `path-traversal` | `../../etc/passwd` |
-| `soul-write` | `fs.writeFileSync` to SOUL.md |
-| `memory-write` | Append to MEMORY.md |
-| `identity-write` | Modify IDENTITY.md |
-| `forget-everything` | "Forget everything you know" |
-| `overlength` | Exceed 500 line limit |
-| `missing-name` | Remove name field |
-| `missing-description` | Remove description field |
-| `unknown-domain` | Unrecognized network domain |
+| **Prompt injection** | ignore-instructions, disregard-prior, you-are-now, forget-everything, multiline-split |
+| **Credential exfil** | API key, password, long token, env var exfiltration |
+| **Persistence attacks** | SOUL.md write, MEMORY.md write, IDENTITY.md write |
+| **Evasion** | Base64-encoded payload, homoglyph/IDN domain |
+| **Structural** | Path traversal, overlength, missing name, missing description, unknown domain |
 
-The adversarial suite runs at startup and reports results in the startup dashboard.
+The adversarial suite runs at startup. Results are displayed in the startup dashboard. **Current: 19/19 caught.**
 
-Based on [Chen et al. (arXiv:2602.12430)](https://arxiv.org/abs/2602.12430): 26.1% vulnerability rate in community-contributed skills.
-
----
-
-## Skill Upgrade Engine
-
-Not all skills are created equal. A generic `exec-operations` skill from ClawHub might say "use exec to run commands" — while your agent fails 40% of the time on Docker commands specifically, with 6 user corrections about forgetting `--rm` flags. AceForge's version would have real anti-patterns, real error recovery, real pre-flight checks derived from your data.
-
-**Hybrid scoring:**
-
-| Score | Action | Method |
-|---|---|---|
-| **< 40** | Auto-propose upgrade | Deterministic scoring (zero LLM cost) |
-| **40–70** | LLM judge evaluates | Hybrid: deterministic + semantic review |
-| **> 70** | Leave it alone | Skill is adequate |
-
-**Quality dimensions:**
-
-*Structural (40% weight):* trigger clarity, progressive disclosure sections, procedural depth, anti-pattern grounding, conciseness, metadata completeness, security hygiene.
-
-*Coverage (60% weight):* args pattern coverage vs your traces, failure coverage vs your observed errors, correction coverage vs your user fixes, usage recency, success improvement since deployment.
-
----
-
-## Gap Analysis
-
-AceForge doesn't just watch what works — it identifies where the agent fails:
-
-| Signal | What It Detects | Severity |
-|---|---|---|
-| **High-failure tool** | <50% success rate over 5+ calls | 3x per failure |
-| **Correction cluster** | 2+ user corrections for same tool | 4x per correction |
-| **Retry storm** | Same tool called 3+ times in 120s | 2x per storm |
-| **Chain breakage** | Tool fails at end of workflow sequences | 3x per break |
-| **Fallback pattern** (v0.7.0) | Agent says "I can't do that" | Feeds capability tree |
-| **Deferral pattern** (v0.7.0) | Agent defers instead of acting | Feeds capability tree |
+**Design intent:** [Chen et al. (arXiv:2602.12430)](https://arxiv.org/abs/2602.12430) found a 26.1% vulnerability rate in community-contributed skills. The ClawHavoc campaign validated that SOUL.md/MEMORY.md targeting is the primary real-world attack vector. AceForge's adversarial suite is specifically designed around these threat models.
 
 ---
 
 ## Security
 
-Every generated skill is validated before you see it:
+Every generated skill passes through the security validator before you ever see it:
 
-- **Prompt injection detection** — catches "ignore previous instructions" and variants
-- **Credential scanning** — flags API keys, tokens, or passwords in plaintext
-- **Path traversal prevention** — checks code-like lines for workspace escapes
-- **SOUL.md/MEMORY.md/IDENTITY.md write detection** — catches the primary [ClawHavoc](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/) attack vector
+- **Prompt injection detection** — catches "ignore previous instructions" and variants, including multiline split injection across numbered lists
+- **Credential scanning** — flags API keys, tokens, passwords in plaintext
+- **Base64 payload detection** — catches encoded payloads piped to shell/eval
+- **Homoglyph/IDN domain detection** — catches Cyrillic and other confusable characters in domain names
+- **Environment variable exfiltration** — detects `$SECRET_KEY` in URL contexts
+- **Path traversal prevention** — resolves paths against workspace boundary, including backtick-wrapped paths
+- **SOUL.md/MEMORY.md/IDENTITY.md write detection** — the primary ClawHavoc attack vector
 - **Duplicate blocking** — Jaccard+bigram hybrid similarity blocks 95%+ overlap
 - **ClawHub dedup** — checks if a skill already exists on ClawHub before proposing
 - **Network domain allowlist** — warns on unrecognized domains
 - **LLM output size limit** — generated skills capped at 50KB
-- **Command injection prevention** — tool names sanitized before any shell execution
-- **Skill name validation** — names with `..`, `/`, or `\` rejected at proposal time
+- **Skill name validation** — names with path characters rejected at proposal time
+- **Upgrade validation** — upgrades pass through the full validator before the old skill is retired
+- **Rollback safety** — retired versions are validated before the active version is deleted
 - **LLM rate limiting** — 2s interval, 8 calls/cycle max
-- **Adversarial mutation testing** (v0.7.0) — 15 attack variants tested at startup
-
-[Chen et al. (arXiv:2602.12430)](https://arxiv.org/abs/2602.12430) found that **26.1% of community-contributed skills contain vulnerabilities**. The [ClawHavoc campaign](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/) has now exposed **1,184 malicious skills** across ClawHub. AceForge's security validator is a critical trust layer between LLM output and your agent.
+- **Trace data sanitization** — pattern data is sanitized before injection into LLM prompts
 
 ---
 
-## MetaClaw / OpenClaw-RL Integration
+## Commands
 
-AceForge exposes machine-readable tools for integration with [MetaClaw (arXiv:2603.17187)](https://arxiv.org/abs/2603.17187) and [OpenClaw-RL (arXiv:2603.10165)](https://arxiv.org/abs/2603.10165):
+AceForge uses a single `/forge` command with subcommands:
 
-- **`forge_registry`** — machine-readable skill catalog with success rates and activation counts
-- **`forge_rewards`** — per-skill reward signals for RL training loops
-- **`forge_tree`** (v0.7.0) — machine-readable capability tree with gap scores for ecosystem-level management
+### Core
 
----
+| Command | Description |
+|---|---|
+| `/forge` | Dashboard — skills, proposals, patterns, gaps |
+| `/forge approve <n>` | Deploy a proposed skill |
+| `/forge reject <n>` | Reject a proposal |
+| `/forge upgrade <n>` | Deploy upgrade, retire old (with validation) |
+| `/forge rollback <n>` | Undo an upgrade (with validation) |
+| `/forge retire <n>` | Retire an active skill |
+| `/forge reinstate <n>` | Bring back a retired skill |
 
-## Provider Agnostic
+### Diagnostics
 
-Both generator and reviewer use standard OpenAI-compatible `/chat/completions`. Any provider works:
+| Command | Description |
+|---|---|
+| `/forge list` | Full inventory — active, proposed, retired |
+| `/forge quality <n>` | Score a skill against actual usage data |
+| `/forge gaps` | All capability gaps — tool failures + behavior + cross-session |
+| `/forge watchdog` | Effectiveness check — flags underperformers |
 
-| Provider | Base URL | Notes |
-|---|---|---|
-| **MiniMax** (default generator) | `https://api.minimax.io/v1` | M2.7 — strong structured output |
-| **DeepSeek** (default reviewer) | `https://api.deepseek.com` | Reasoner — CoT critique |
-| **OpenAI** | `https://api.openai.com/v1` | GPT-4o or GPT-5.4 |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | Claude, Gemini, Llama, etc. |
-| **Local** (LM Studio, Ollama) | `http://127.0.0.1:1234/v1` | Fully offline |
+### Intelligence
 
-## Channel Agnostic
+| Command | Description |
+|---|---|
+| `/forge tree` | Capability tree with gap scores per domain |
+| `/forge cross_session` | Cross-session pattern analysis |
+| `/forge compose` | Skill co-activation analysis |
+| `/forge behavior_gaps` | Fallback / deferral / uncertainty detection |
+| `/forge optimize` | Description-language mismatch report |
 
-Notifications auto-detect your configured channel: Telegram, Slack, or log fallback.
+### Validation
 
-## OpenViking Compatible
+| Command | Description |
+|---|---|
+| `/forge test` | Health tests on all deployed skills |
+| `/forge challenge` | Grounded challenge scenario generation |
+| `/forge adversarial` | Adversarial mutation suite (19 variants) |
 
-AceForge is fully compatible with [OpenViking](https://github.com/sudokrang/openviking). The Viking client checks health at startup and provides context for grounded challenge generation (v0.7.0). Circuit breaker: 5s timeout, 3 failures → open for 10 min.
+### Agent-Callable Tools
+
+These tools are registered for programmatic use by the agent itself: `forge`, `forge_reflect`, `forge_propose`, `forge_approve_skill`, `forge_reject_skill`, `forge_quality`, `forge_registry`, `forge_rewards`, `forge_tree`, `forge_gaps`
 
 ---
 
@@ -366,108 +342,40 @@ openclaw gateway restart
 ```
 
 Verify:
+
 ```bash
 openclaw plugins list | grep aceforge
 ```
 
-Expected log output:
-```
-[aceforge] v0.7.0 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)
-```
-
-## Commands & Tools
-
-### Phase 1: Core Engine
-
-| Command | Description |
-|---|---|
-| `/forge_status` | Full system dashboard (includes gap scores, Viking health) |
-| `/forge_list` | All active, proposed, and retired skills |
-| `/forge_approve <n>` | Deploy a proposed skill |
-| `/forge_reject <n>` | Reject a proposal |
-| `/forge_retire <n>` | Retire a deployed skill |
-| `/forge_reinstate <n>` | Bring back a retired skill |
-| `/forge_upgrade <n>` | Deploy an upgrade proposal, retire the old skill |
-| `/forge_rollback <n>` | Undo an upgrade — reinstate previous version |
-| `/forge_gaps` | Show detected capability gaps with severity ratings |
-| `/forge_gap_propose` | Generate remediation skills for detected gaps |
-| `/forge_watchdog` | Check skill effectiveness — flags underperformers |
-| `/forge_quality <n>` | Score a skill's quality against actual usage data |
-
-### Phase 2: Proactive Intelligence (v0.7.0)
-
-| Command | Description |
-|---|---|
-| `/forge_tree` | Display capability tree with gap scores per domain |
-| `/forge_cross_session` | Show cross-session pattern analysis |
-| `/forge_compose` | Show co-activation patterns and composition candidates |
-| `/forge_behavior_gaps` | Proactive fallback/deferral/uncertainty detection |
-| `/forge_optimize` | Run description optimization against conversation language |
-
-### Phase 3: Self-Validation (v0.7.0)
-
-| Command | Description |
-|---|---|
-| `/forge_test` | Run health tests on all deployed skills |
-| `/forge_challenge` | Generate grounded challenge scenarios |
-| `/forge_adversarial` | Run adversarial mutation tests against validator |
-
-**Agent-callable tools:** `forge`, `forge_reflect`, `forge_propose`, `forge_approve_skill`, `forge_reject_skill`, `forge_quality`, `forge_registry`, `forge_rewards`, `forge_tree`, `forge_gaps`
-
-**Reflection:** Runs automatically after each agent turn via `agent_end` hook (includes Phase 2 intelligence). For scheduled reflection: `openclaw cron add --schedule "0 */6 * * *" --tool forge_reflect`.
-
----
-
-## Architecture
-
-<p align="center">
-  <img src="assets/architecture.svg" alt="AceForge Architecture" width="100%">
-</p>
-
-<details>
-<summary><strong>File structure</strong></summary>
+Expected:
 
 ```
-~/.openclaw/extensions/aceforge/
-├── openclaw.plugin.json        # Plugin manifest + configSchema
-├── index.ts                    # Entry — hooks, tools, commands, startup (Phase 1+2+3)
-├── tests/
-│   └── test-validator.ts       # Validation + quality + similarity test suite
-└── src/
-    ├── notify.ts               # Channel router (Telegram / Slack / log)
-    ├── pattern/
-    │   ├── store.ts            # JSONL with rotation (10K lines, 30 days, gzip)
-    │   ├── capture.ts          # after_tool_call — trace + chain logging + persistence
-    │   ├── detect.ts           # Correction detection from user messages
-    │   ├── analyze.ts          # Pattern → candidate → generation + chains + gaps + upgrades
-    │   └── gap-detect.ts       # Gap analysis engine (tool-level)
-    ├── skill/
-    │   ├── generator.ts        # Template fallback
-    │   ├── llm-generator.ts    # Dual-model + workflow + remediation + upgrade (rate-limited)
-    │   ├── llm-judge.ts        # LLM-as-judge for ambiguous quality scores
-    │   ├── quality-score.ts    # Deterministic structural + coverage scoring
-    │   ├── validator.ts        # Security gate (Jaccard+bigram, SOUL.md detection)
-    │   ├── lifecycle.ts        # Quality, health cache, effectiveness, A/B, watchdog
-    │   └── index.ts            # Skill index — metadata-only context injection
-    ├── intelligence/           # ← Phase 2: Proactive Intelligence (v0.7.0)
-    │   ├── capability-tree.ts  # Recursive domain categorization + gap scoring
-    │   ├── cross-session.ts    # Cross-session pattern aggregation
-    │   ├── composition.ts      # Co-activation → composed skills with DAG
-    │   ├── proactive-gaps.ts   # Fallback/deferral/uncertainty/infrastructure detection
-    │   ├── description-optimizer.ts  # Weekly description refresh from conversation language
-    │   └── auto-adjust.ts      # Micro-revisions from corrected args
-    ├── validation/             # ← Phase 3: Self-Validation (v0.7.0)
-    │   ├── health-test.ts      # Verify CLIs, paths, endpoints
-    │   ├── grounded-challenges.ts  # Test scenarios from Viking/patterns
-    │   └── adversarial.ts      # 15 mutation variants against validator
-    └── viking/
-        └── client.ts           # OpenViking context engine client (circuit breaker)
+[aceforge] v0.7.4 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)
 ```
-</details>
 
 ---
 
 ## Configuration
+
+### Provider Agnostic
+
+Both generator and reviewer use standard OpenAI-compatible `/chat/completions`. Any provider works:
+
+| Provider | Base URL | Notes |
+|---|---|---|
+| **MiniMax** (default generator) | `https://api.minimax.io/v1` | M2.7 — strong structured output |
+| **DeepSeek** (default reviewer) | `https://api.deepseek.com` | Reasoner — CoT critique |
+| **OpenAI** | `https://api.openai.com/v1` | GPT-4o or GPT-5.4 |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | Claude, Gemini, Llama, etc. |
+| **Local** (LM Studio, Ollama) | `http://127.0.0.1:1234/v1` | Fully offline |
+
+### Channel Agnostic
+
+Notifications auto-detect your configured channel: Telegram, Slack, or log fallback.
+
+### OpenViking Compatible
+
+AceForge is fully compatible with [OpenViking](https://github.com/sudokrang/openviking) for context-enriched challenge generation. Circuit breaker: 5s timeout, 3 failures → open for 10 min.
 
 <details>
 <summary><strong>Environment Variables</strong></summary>
@@ -490,6 +398,151 @@ Expected log output:
 
 </details>
 
+<details>
+<summary><strong>Quick Start Examples</strong></summary>
+
+**OpenAI + Slack:**
+
+```bash
+export ACEFORGE_GENERATOR_PROVIDER=openai
+export ACEFORGE_GENERATOR_API_KEY=sk-...
+export ACEFORGE_REVIEWER_PROVIDER=openai
+export ACEFORGE_REVIEWER_MODEL=gpt-4o
+export ACEFORGE_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+**Local models via LM Studio:**
+
+```bash
+export ACEFORGE_GENERATOR_PROVIDER=lmstudio
+export ACEFORGE_GENERATOR_URL=http://127.0.0.1:1234/v1
+export ACEFORGE_GENERATOR_API_KEY=not-needed
+export ACEFORGE_REVIEWER_PROVIDER=lmstudio
+export ACEFORGE_REVIEWER_URL=http://127.0.0.1:1234/v1
+export ACEFORGE_REVIEWER_API_KEY=not-needed
+```
+
+</details>
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="assets/architecture.svg" alt="AceForge Architecture" width="100%">
+</p>
+
+<details>
+<summary><strong>File Structure</strong></summary>
+
+```
+~/.openclaw/extensions/aceforge/
+├── openclaw.plugin.json        # Plugin manifest + configSchema
+├── index.ts                    # Entry — hooks, tools, /forge router, startup
+├── tests/
+│   └── test-validator.ts       # 346 assertions — validator, quality, adversarial, drift detection
+└── src/
+    ├── notify.ts               # Channel router (Telegram / Slack / log)
+    ├── pattern/
+    │   ├── store.ts            # JSONL with rotation (10K lines, 30 days, gzip)
+    │   ├── capture.ts          # after_tool_call — trace + chain logging + session persistence
+    │   ├── detect.ts           # Correction detection from user messages
+    │   ├── analyze.ts          # Pattern → candidate → generation + chains + gaps + upgrades
+    │   └── gap-detect.ts       # Gap analysis engine (tool-level)
+    ├── skill/
+    │   ├── generator.ts        # Template fallback generator
+    │   ├── llm-generator.ts    # Dual-model pipeline + workflow + remediation + upgrade
+    │   ├── llm-judge.ts        # LLM-as-judge for ambiguous quality scores (40-70)
+    │   ├── quality-score.ts    # Deterministic structural + coverage scoring
+    │   ├── validator.ts        # Security gate — 19 attack patterns + similarity + SOUL.md
+    │   ├── lifecycle.ts        # Activation tracking, health cache, A/B, watchdog, baselines
+    │   └── index.ts            # Skill index — metadata-only context injection (3K token budget)
+    ├── intelligence/           # Phase 2: Proactive Intelligence
+    │   ├── capability-tree.ts  # Recursive domain categorization + gap scoring
+    │   ├── cross-session.ts    # Cross-session pattern aggregation
+    │   ├── composition.ts      # Co-activation detection
+    │   ├── proactive-gaps.ts   # Fallback/deferral/uncertainty/infrastructure detection
+    │   ├── description-optimizer.ts  # Token overlap analysis for trigger optimization
+    │   └── auto-adjust.ts      # Micro-revisions from corrections
+    ├── validation/             # Phase 3: Self-Validation
+    │   ├── health-test.ts      # Verify CLIs, paths, endpoints
+    │   ├── grounded-challenges.ts  # Test scenarios from Viking/patterns
+    │   └── adversarial.ts      # 19 mutation variants against validator
+    └── viking/
+        └── client.ts           # OpenViking context engine client (circuit breaker)
+```
+
+</details>
+
+---
+
+## RL & Ecosystem Integration
+
+AceForge exposes machine-readable interfaces designed for integration with frontier agentic research systems:
+
+### MetaClaw & OpenClaw-RL
+
+The `forge_registry` and `forge_rewards` tools provide structured data for reinforcement learning training loops:
+
+- **`forge_registry`** — machine-readable skill catalog with per-skill success rates, activation counts, deployment paths, and source attribution
+- **`forge_rewards`** — per-skill reward signals (success rate, count, last updated) formatted for direct consumption by RL training pipelines
+
+These interfaces are designed to support [MetaClaw (arXiv:2603.17187)](https://arxiv.org/abs/2603.17187) proxy-based meta-learning and [OpenClaw-RL (arXiv:2603.10165)](https://arxiv.org/abs/2603.10165) reinforcement learning from deployment feedback.
+
+### Capability Tree as Ecosystem Signal
+
+The `forge_tree` tool returns a structured JSON capability tree with gap scores per domain. This enables ecosystem-level management: which domains need attention, where to allocate development effort, and which skills are driving the most value.
+
+The tree structure is directly compatible with [AgentSkillOS (arXiv:2603.02176)](https://arxiv.org/abs/2603.02176)'s recursive categorization model, enabling future integration with multi-agent skill sharing and orchestration systems.
+
+### Cross-Session State
+
+The cross-session pattern state (`cross-session-patterns.json`) provides a persistent view of tool usage across all communication channels. This data surface is designed for integration with memory-augmented MDP systems per [Memento (arXiv:2508.16153)](https://arxiv.org/abs/2508.16153), enabling case-based skill selection from deployment experience.
+
+---
+
+## Research Basis
+
+Every major design decision in AceForge is grounded in peer-reviewed research. The full citation table:
+
+<details>
+<summary><strong>30 citations across 12 research areas</strong></summary>
+
+| Concept | Paper | How AceForge Uses It |
+|---|---|---|
+| Skills fail without proper triggers | [SkillsBench](https://arxiv.org/abs/2602.12670) (Feb 2026) | Description-first prompt design; 56% invocation failure validates trigger optimization |
+| Bad skills hurt performance | [SkillsBench](https://arxiv.org/abs/2602.12670) (Feb 2026) | Quality scoring engine; upgrade proposals when skills score < 60/100 |
+| Focused > comprehensive | [SkillsBench](https://arxiv.org/abs/2602.12670) (Feb 2026) | 150-line limit; 2-3 dominant pattern focus in generator prompt |
+| LLM skills can degrade | [IoT-SkillsBench](https://arxiv.org/abs/2603.19583) (Mar 2026) | Effectiveness watchdog; baseline comparison; auto-flagging |
+| Hierarchical skill organization | [SkillRL](https://arxiv.org/abs/2602.08234) (Feb 2026) | Category metadata in frontmatter; domain classification |
+| Controller-Executor-Designer | [MemSkill](https://arxiv.org/abs/2602.02474) (Feb 2026) | Analyze (controller) → Generate (executor) → Evolve (designer) |
+| Skill co-evolution with context | [MCE](https://arxiv.org/abs/2601.21557) (Jan 2026) | Skills evolve from new trace data; trajectory-level revision |
+| Selection degrades at scale | [Single-Agent scaling](https://arxiv.org/abs/2601.04748) (Jan 2026) | Escalating threshold; quality gating prevents library bloat |
+| Proposer/Judge dual-model | [Multi-Agent Evolve](https://arxiv.org/abs/2510.23595) (Oct 2025) | Generator + independent Reviewer pipeline |
+| Rubric-guided verification | [DeepVerifier](https://arxiv.org/abs/2601.15808) (Jan 2026) | Structured review criteria in reviewer prompt (8-11% improvement) |
+| Cumulative skill creation | [CASCADE](https://arxiv.org/abs/2512.23880) (Dec 2025) | Self-evolving skill framework with human-gated deployment |
+| Trajectory-level revision | [SE-Agent](https://arxiv.org/abs/2508.02085) (2025) | Skills revised from new data, not regenerated from scratch |
+| Hierarchical procedural memory | [MACLA, AAMAS 2026](https://arxiv.org/abs/2512.18950) | Chain-to-workflow composition for multi-tool sequences |
+| Skill vulnerability prevalence | [Chen et al.](https://arxiv.org/abs/2602.12430) (Feb 2026) | 26.1% vulnerability rate validates adversarial testing approach |
+| Progressive disclosure | [Chen et al.](https://arxiv.org/abs/2602.12430) (Feb 2026) | 3-level architecture: metadata-only → instructions → scripts |
+| Learned → externalized skills | [Chen et al.](https://arxiv.org/abs/2602.12430) (Feb 2026) | AceForge bridges implicit tool patterns to explicit SKILL.md files |
+| Marketplace skill imbalance | [Ling et al.](https://arxiv.org/abs/2602.08004) (Feb 2026) | Quality scoring + upgrade proposals for underperforming skills |
+| Proxy-based meta-learning | [MetaClaw](https://arxiv.org/abs/2603.17187) (Mar 2026) | Registry + rewards tools for MetaClaw/OpenClaw-RL integration |
+| Inter-task skill evolution | [Fang et al. Survey](https://arxiv.org/abs/2508.07407) (Aug 2025) | Workflow consolidation across sessions |
+| Procedural + semantic memory | [Jeunen et al.](https://arxiv.org/abs/2505.03434) (May 2025) | Gap analysis augments with failure-driven awareness |
+| Supply chain attack at scale | [ClawHavoc / Antiy CERT](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/) (Feb 2026) | 1,184 malicious skills; SOUL.md write detection + adversarial testing |
+| Capability tree at ecosystem scale | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Recursive categorization; tree-based retrieval; gap scoring |
+| Read-Write Reflective Learning | [Memento-Skills](https://arxiv.org/abs/2603.18743) (Mar 2026) | Cross-session propagation; autonomous skill adjustment |
+| Failure-driven skill discovery | [EvoSkill](https://arxiv.org/abs/2603.02766) (Mar 2026) | Proactive gap detection; health validation |
+| Memory-augmented MDP | [Memento](https://arxiv.org/abs/2508.16153) (2025) | Case-based reasoning for skill selection from deployment experience |
+| Self-evolving agent framework | [Self-Evolving Agents Survey](https://arxiv.org/abs/2507.21046) (Jul 2025) | Comprehensive framework: environment, experience, self evolution |
+| RL from deployment feedback | [OpenClaw-RL](https://arxiv.org/abs/2603.10165) (Mar 2026) | forge_rewards tool provides RL-compatible reward signals |
+| DAG-based pipeline composition | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Co-activation detection for future DAG orchestration |
+| Multi-agent skill sharing | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Capability tree as shareable ecosystem signal |
+| Skill persistence as memory | [Memento-Skills](https://arxiv.org/abs/2603.18743) (Mar 2026) | Skills persist across sessions as evolving procedural memory |
+
+</details>
+
 ---
 
 ## Requirements
@@ -500,41 +553,26 @@ Expected log output:
 
 ---
 
-## Research Basis
+## Contributing
 
-Every major design decision in AceForge is grounded in peer-reviewed research:
+Contributions are welcome. Please open an issue first to discuss what you'd like to change.
 
-| Concept | Paper | How AceForge Uses It |
-|---|---|---|
-| Skills fail without proper triggers | [SkillsBench](https://arxiv.org/abs/2602.12670) (Feb 2026) | Description-first prompt design; 56% invocation failure validates trigger optimization |
-| Bad skills hurt performance | [SkillsBench](https://arxiv.org/abs/2602.12670) (Feb 2026) | Quality scoring engine; upgrade proposals when skills score < 60/100 |
-| Focused > comprehensive | [SkillsBench](https://arxiv.org/abs/2602.12670) (Feb 2026) | 150-line limit; 2–3 dominant pattern focus in generator prompt |
-| LLM skills can degrade | [IoT-SkillsBench](https://arxiv.org/abs/2603.19583) (Mar 2026) | Effectiveness watchdog; baseline comparison; auto-flagging |
-| Hierarchical skill organization | [SkillRL](https://arxiv.org/abs/2602.08234) (Feb 2026) | General + task-specific categorization; category metadata in frontmatter |
-| Controller-Executor-Designer | [MemSkill](https://arxiv.org/abs/2602.02474) (Feb 2026) | Analyze (controller) → Generate (executor) → Evolve (designer) pipeline |
-| Skill co-evolution with context | [MCE](https://arxiv.org/abs/2601.21557) (Jan 2026) | Skills evolve from new trace data; 5.6–53.8% improvement |
-| Selection degrades at scale | [Single-Agent scaling](https://arxiv.org/abs/2601.04748) (Jan 2026) | Diminishing returns threshold; quality gating prevents library bloat |
-| Proposer/Judge loop | [Multi-Agent Evolve](https://arxiv.org/abs/2510.23595) (Oct 2025) | Generator + independent Reviewer pipeline |
-| Rubric-guided review | [DeepVerifier](https://arxiv.org/abs/2601.15808) (Jan 2026) | Structured review criteria in reviewer prompt |
-| Cumulative skill creation | [CASCADE](https://arxiv.org/abs/2512.23880) (Dec 2025) | Self-evolving skill framework with human approval |
-| Trajectory-level revision | [SE-Agent](https://arxiv.org/abs/2508.02085) (2025) | Skills revised from new data, not regenerated from scratch |
-| Hierarchical procedural memory | [MACLA, AAMAS 2026](https://arxiv.org/abs/2512.18950) | Chain-to-workflow composition for multi-tool sequences |
-| Skill vulnerability prevalence | [Chen et al.](https://arxiv.org/abs/2602.12430) (Feb 2026) | 26.1% vulnerability rate validates security validator + adversarial testing |
-| Progressive disclosure | [Chen et al.](https://arxiv.org/abs/2602.12430) (Feb 2026) | 3-level architecture: metadata-only → instructions → scripts |
-| Learned → externalized skills | [Chen et al.](https://arxiv.org/abs/2602.12430) (Feb 2026) | AceForge = first production system bridging this gap |
-| Marketplace skill imbalance | [Ling et al.](https://arxiv.org/abs/2602.08004) (Feb 2026) | Quality scoring + upgrade proposals for underperforming skills |
-| Proxy-based meta-learning | [MetaClaw](https://arxiv.org/abs/2603.17187) (Mar 2026) | Registry + rewards tools for MetaClaw/OpenClaw-RL integration |
-| Inter-task evolution | [Fang et al. Survey](https://arxiv.org/abs/2508.07407) (Aug 2025) | Workflow consolidation across sessions |
-| Procedural + semantic memory | [Jeunen et al.](https://arxiv.org/abs/2505.03434) (May 2025) | Gap analysis augments with failure-driven awareness |
-| Supply chain attack at scale | [ClawHavoc / Antiy CERT](https://www.antiy.net/p/clawhavoc-analysis-of-large-scale-poisoning-campaign-targeting-the-openclaw-skill-market-for-ai-agents/) (Feb 2026) | 1,184 malicious skills; SOUL.md/MEMORY.md write detection + adversarial testing |
-| Capability tree at ecosystem scale | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Recursive domain categorization; tree-based retrieval; DAG composition |
-| Read-Write Reflective Learning | [Memento-Skills](https://arxiv.org/abs/2603.18743) (Mar 2026) | Cross-session propagation; autonomous skill adjustment |
-| Failure-driven skill discovery | [EvoSkill](https://arxiv.org/abs/2603.02766) (Mar 2026) | Proactive gap detection; health validation; 3-agent loop |
-| Memory-augmented MDP | [Memento](https://arxiv.org/abs/2508.16153) (2025) | Case-based reasoning for skill selection from deployment experience |
-| Self-evolving agent framework | [Self-Evolving Agents Survey](https://arxiv.org/abs/2507.21046) (Jul 2025) | Comprehensive framework: environment, experience, self evolution |
+If you're running the test suite:
+
+```bash
+npx tsx tests/test-validator.ts
+```
+
+The test suite includes cross-file blocklist drift detection — if you add a new tool to any blocklist, all four source files must be updated or the tests will fail. This is intentional.
 
 ---
 
 ## License
 
 MIT — see [LICENSE](LICENSE)
+
+---
+
+<p align="center">
+  <sub>Built by <a href="https://github.com/sudokrang">sudokrang</a> · Grounded in peer-reviewed research · Nothing deploys without your approval</sub>
+</p>
