@@ -38,7 +38,7 @@ function loadNotifyConfig(): NotifyConfig {
   const tgChatId =
     process.env.ACEFORGE_OWNER_CHAT_ID ||
     (config as any)?.session?.identityLinks?.sean?.find((l: string) => l.startsWith("telegram:"))?.split(":")[1] ||
-    "6326139181"; // Sean's Telegram ID as last-resort fallback
+    ""; // No hardcoded fallback — configure ACEFORGE_OWNER_CHAT_ID
   const telegramAvailable = !!(tgToken && tgChatId);
 
   const slackWebhook = process.env.ACEFORGE_SLACK_WEBHOOK_URL || "";

@@ -312,7 +312,7 @@ export function expireOldProposals(notifyFn?: (msg: string) => Promise<void>): v
     const propDir = path.join(proposalsDir, name);
     try {
       if (!fsSync.statSync(propDir).isDirectory()) continue;
-      if (now - fsSync.statSync(propDir).mtimeMs > EXPIRY_MS) continue;
+      if (now - fsSync.statSync(propDir).mtimeMs < EXPIRY_MS) continue;
     } catch { continue; }
 
     fsSync.rmSync(propDir, { recursive: true, force: true });

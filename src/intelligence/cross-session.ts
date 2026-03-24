@@ -1,13 +1,7 @@
 /**
  * Cross-Session Pattern Propagation — Phase 2B
  *
- * Aggregates tool usage patterns across all sessions to identify global recurring
- * patterns that only become visible when you look at the agent's entire history.
- * Single-session analysis misses patterns that span Telegram + Slack + iMessage + cron.
- *
- * Research: Memento-Skills (arXiv:2603.18743) — skills as persistent evolving memory;
- * Read-Write Reflective Learning enables carrying forward knowledge across interactions.
- * Memento (arXiv:2508.16153) — Memory-augmented MDP; case-based reasoning.
+ * v0.7.1 fix: H2 — correction uniqueSessions now counted per-tool, not global
  */
 import * as os from "os";
 import * as fsSync from "fs";
@@ -16,8 +10,6 @@ import * as path from "path";
 const HOME = os.homedir() || process.env.HOME || "";
 const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
 const CROSS_SESSION_FILE = path.join(FORGE_DIR, "cross-session-patterns.json");
-
-// ─── Types ──────────────────────────────────────────────────────────────
 
 interface PatternEntry {
   ts: string;
@@ -28,7 +20,7 @@ interface PatternEntry {
   type?: string;
   error?: string | null;
   tools?: string[];
-  correctedArgs?: string;
+  text_fragment?: string;
   [key: string]: unknown;
 }
 
@@ -46,6 +38,7 @@ export interface CorrectionCluster {
   totalCorrections: number;
   uniqueSessions: number;
   phrases: string[];
+  sessionIds: string[]; // H2 fix: track per-tool session IDs
 }
 
 export interface CrossSessionChain {
@@ -60,8 +53,6 @@ export interface CrossSessionState {
   correctionClusters: Record<string, CorrectionCluster>;
   crossSessionChains: Record<string, CrossSessionChain>;
 }
-
-// ─── Load/Save ──────────────────────────────────────────────────────────
 
 function loadState(): CrossSessionState {
   try {
@@ -87,8 +78,6 @@ function saveState(state: CrossSessionState): void {
   }
 }
 
-// ─── Pattern Reading ────────────────────────────────────────────────────
-
 function readPatterns(): PatternEntry[] {
   const file = path.join(FORGE_DIR, "patterns.jsonl");
   if (!fsSync.existsSync(file)) return [];
@@ -100,11 +89,8 @@ function readPatterns(): PatternEntry[] {
     .filter(Boolean) as PatternEntry[];
 }
 
-// ─── Token Extraction ───────────────────────────────────────────────────
-
 function extractArgTokens(argsSummary: string): string[] {
   if (!argsSummary) return [];
-  // Extract meaningful tokens from args (field names, paths, commands)
   return argsSummary
     .replace(/[{}":\[\]]/g, " ")
     .split(/[\s,]+/)
@@ -112,8 +98,6 @@ function extractArgTokens(argsSummary: string): string[] {
     .map(t => t.toLowerCase())
     .slice(0, 10);
 }
-
-// ─── Merge Patterns ─────────────────────────────────────────────────────
 
 const TOOL_BLOCKLIST = new Set([
   "forge", "forge_status", "forge_reflect", "forge_propose",
@@ -128,26 +112,18 @@ export function mergePatterns(): CrossSessionState {
   const patterns = readPatterns();
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-  // Reset for fresh computation
   const toolStats: Record<string, ToolStat> = {};
   const correctionClusters: Record<string, CorrectionCluster> = {};
   const chainMap: Record<string, { sessions: Set<string>; count: number }> = {};
 
-  // Process tool traces
   for (const p of patterns) {
     if (new Date(p.ts).getTime() < cutoff) continue;
 
-    // Tool traces
     if (p.type !== "correction" && p.type !== "chain" && p.tool && !TOOL_BLOCKLIST.has(p.tool)) {
       if (!toolStats[p.tool]) {
         toolStats[p.tool] = {
-          totalAcrossSessions: 0,
-          uniqueSessions: 0,
-          successRate: 0,
-          commonArgs: [],
-          commonErrors: [],
-          lastSeen: p.ts,
-          sessionList: [],
+          totalAcrossSessions: 0, uniqueSessions: 0, successRate: 0,
+          commonArgs: [], commonErrors: [], lastSeen: p.ts, sessionList: [],
         };
       }
       const stat = toolStats[p.tool];
@@ -158,16 +134,14 @@ export function mergePatterns(): CrossSessionState {
       if (new Date(p.ts).getTime() > new Date(stat.lastSeen).getTime()) {
         stat.lastSeen = p.ts;
       }
-      // Accumulate arg tokens
       if (p.args_summary) {
         for (const token of extractArgTokens(p.args_summary)) {
           if (!stat.commonArgs.includes(token)) {
             stat.commonArgs.push(token);
-            if (stat.commonArgs.length > 20) stat.commonArgs.shift(); // keep recent
+            if (stat.commonArgs.length > 20) stat.commonArgs.shift();
           }
         }
       }
-      // Accumulate errors
       if (!p.success && p.error) {
         const errKey = (typeof p.error === "string" ? p.error : "").slice(0, 60);
         if (errKey && !stat.commonErrors.includes(errKey)) {
@@ -177,9 +151,8 @@ export function mergePatterns(): CrossSessionState {
       }
     }
 
-    // Corrections
+    // Corrections — H2 fix: track session IDs per tool
     if (p.type === "correction") {
-      // Find which tool this correction is about
       const nearestTool = patterns.find(np =>
         np.type !== "correction" && np.type !== "chain" &&
         np.session === p.session && np.tool &&
@@ -187,18 +160,21 @@ export function mergePatterns(): CrossSessionState {
       );
       const tool = nearestTool?.tool || "_unattributed";
       if (!correctionClusters[tool]) {
-        correctionClusters[tool] = { totalCorrections: 0, uniqueSessions: 0, phrases: [] };
+        correctionClusters[tool] = { totalCorrections: 0, uniqueSessions: 0, phrases: [], sessionIds: [] };
       }
       const cluster = correctionClusters[tool];
       cluster.totalCorrections++;
-      const phrase = ((p as any).text_fragment || "").slice(0, 80);
+      const phrase = (p.text_fragment || "").slice(0, 80);
       if (phrase && !cluster.phrases.includes(phrase)) {
         cluster.phrases.push(phrase);
         if (cluster.phrases.length > 10) cluster.phrases.shift();
       }
+      // H2 fix: track THIS tool's correction sessions
+      if (p.session && !cluster.sessionIds.includes(p.session)) {
+        cluster.sessionIds.push(p.session);
+      }
     }
 
-    // Chains
     if (p.type === "chain" && p.tools && Array.isArray(p.tools)) {
       const key = (p.tools as string[]).join("→");
       if (!chainMap[key]) chainMap[key] = { sessions: new Set(), count: 0 };
@@ -207,7 +183,6 @@ export function mergePatterns(): CrossSessionState {
     }
   }
 
-  // Compute derived stats
   for (const [tool, stat] of Object.entries(toolStats)) {
     stat.uniqueSessions = stat.sessionList.length;
     const toolPatterns = patterns.filter(p =>
@@ -218,24 +193,15 @@ export function mergePatterns(): CrossSessionState {
     stat.successRate = toolPatterns.length > 0 ? Math.round((successes / toolPatterns.length) * 100) / 100 : 0;
   }
 
-  // Compute correction session counts
-  for (const [tool, cluster] of Object.entries(correctionClusters)) {
-    const corrPatterns = patterns.filter(p => p.type === "correction" && new Date(p.ts).getTime() >= cutoff);
-    const sessions = new Set<string>();
-    for (const cp of corrPatterns) {
-      if (cp.session) sessions.add(cp.session);
-    }
-    cluster.uniqueSessions = sessions.size;
+  // H2 fix: use per-tool session IDs for uniqueSessions count
+  for (const [, cluster] of Object.entries(correctionClusters)) {
+    cluster.uniqueSessions = cluster.sessionIds.length;
   }
 
-  // Convert chain sets to arrays
   const crossSessionChains: Record<string, CrossSessionChain> = {};
   for (const [key, data] of Object.entries(chainMap)) {
-    if (data.sessions.size >= 2) { // Only count chains that appear across 2+ sessions
-      crossSessionChains[key] = {
-        occurrences: data.count,
-        sessions: [...data.sessions],
-      };
+    if (data.sessions.size >= 2) {
+      crossSessionChains[key] = { occurrences: data.count, sessions: [...data.sessions] };
     }
   }
 
@@ -243,11 +209,8 @@ export function mergePatterns(): CrossSessionState {
   state.correctionClusters = correctionClusters;
   state.crossSessionChains = crossSessionChains;
   saveState(state);
-
   return state;
 }
-
-// ─── Cross-Session Candidates ───────────────────────────────────────────
 
 export interface CrossSessionCandidate {
   tool: string;
@@ -260,63 +223,48 @@ export interface CrossSessionCandidate {
 export function getCrossSessionCandidates(minSessions: number = 3): CrossSessionCandidate[] {
   const state = loadState();
   if (!state.toolStats) return [];
-
   const candidates: CrossSessionCandidate[] = [];
 
-  // Tools used across many sessions with consistent patterns
   for (const [tool, stat] of Object.entries(state.toolStats)) {
     if (stat.uniqueSessions >= minSessions && stat.totalAcrossSessions >= 5) {
       candidates.push({
-        tool,
-        reason: "high_cross_session_usage",
-        sessions: stat.uniqueSessions,
+        tool, reason: "high_cross_session_usage", sessions: stat.uniqueSessions,
         occurrences: stat.totalAcrossSessions,
         detail: `${stat.totalAcrossSessions}x across ${stat.uniqueSessions} sessions (${Math.round(stat.successRate * 100)}% success)`,
       });
     }
   }
 
-  // Corrections that span multiple sessions (systematic mistakes)
   for (const [tool, cluster] of Object.entries(state.correctionClusters)) {
     if (tool === "_unattributed") continue;
     if (cluster.uniqueSessions >= 2 && cluster.totalCorrections >= 3) {
       candidates.push({
-        tool,
-        reason: "cross_session_corrections",
-        sessions: cluster.uniqueSessions,
+        tool, reason: "cross_session_corrections", sessions: cluster.uniqueSessions,
         occurrences: cluster.totalCorrections,
         detail: `${cluster.totalCorrections} corrections across ${cluster.uniqueSessions} sessions: ${cluster.phrases.slice(0, 2).join("; ")}`,
       });
     }
   }
 
-  // Chains that recur across sessions
   for (const [chain, data] of Object.entries(state.crossSessionChains)) {
     if (data.sessions.length >= minSessions) {
       candidates.push({
-        tool: chain,
-        reason: "cross_session_chain",
-        sessions: data.sessions.length,
+        tool: chain, reason: "cross_session_chain", sessions: data.sessions.length,
         occurrences: data.occurrences,
         detail: `Pipeline ${chain} used ${data.occurrences}x across ${data.sessions.length} sessions`,
       });
     }
   }
 
-  // Sort by session breadth (more sessions = more important)
   candidates.sort((a, b) => b.sessions - a.sessions);
   return candidates;
 }
 
-// ─── Format for Display ─────────────────────────────────────────────────
-
 export function formatCrossSessionReport(): string {
-  const state = mergePatterns(); // Fresh merge
+  const state = mergePatterns();
   const candidates = getCrossSessionCandidates();
-
   let text = `Cross-Session Pattern Report (${new Date(state.updated).toLocaleString()})\n\n`;
 
-  // Top tools by cross-session usage
   const sortedTools = Object.entries(state.toolStats)
     .filter(([, s]) => s.uniqueSessions >= 2)
     .sort(([, a], [, b]) => b.uniqueSessions - a.uniqueSessions)
@@ -330,18 +278,16 @@ export function formatCrossSessionReport(): string {
     text += `\n`;
   }
 
-  // Cross-session corrections
   const corrections = Object.entries(state.correctionClusters)
     .filter(([t, c]) => t !== "_unattributed" && c.totalCorrections >= 2);
   if (corrections.length > 0) {
     text += `Recurring Corrections (cross-session):\n`;
     for (const [tool, cluster] of corrections) {
-      text += `  ${tool}: ${cluster.totalCorrections} corrections — "${cluster.phrases[0] || ""}"\n`;
+      text += `  ${tool}: ${cluster.totalCorrections} corrections across ${cluster.uniqueSessions} sessions — "${cluster.phrases[0] || ""}"\n`;
     }
     text += `\n`;
   }
 
-  // Cross-session chains
   const chains = Object.entries(state.crossSessionChains)
     .filter(([, c]) => c.sessions.length >= 2)
     .sort(([, a], [, b]) => b.sessions.length - a.sessions.length);
@@ -353,7 +299,6 @@ export function formatCrossSessionReport(): string {
     text += `\n`;
   }
 
-  // Candidates
   if (candidates.length > 0) {
     text += `Skill Generation Candidates:\n`;
     for (const c of candidates.slice(0, 5)) {

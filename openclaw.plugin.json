@@ -2,7 +2,7 @@
   "id": "aceforge",
   "name": "AceForge",
   "description": "Self-evolving skill engine — detects patterns, crystallizes skills, manages lifecycle, proactive intelligence, self-validation",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "openclaw": {
     "extensions": [
       "./index.ts"
@@ -14,19 +14,23 @@
     "properties": {
       "crystallizationThreshold": {
         "type": "number",
-        "default": 3
+        "default": 3,
+        "description": "Minimum tool recurrences before crystallization (escalates to 5 at 20+ skills)"
       },
       "successRateMinimum": {
         "type": "number",
-        "default": 0.7
+        "default": 0.7,
+        "description": "Minimum success rate for skill proposals"
       },
       "retirementDays": {
         "type": "number",
-        "default": 30
+        "default": 30,
+        "description": "Days of zero activations before a skill is flagged for retirement"
       },
       "notificationChannel": {
         "type": "string",
-        "default": "auto"
+        "default": "auto",
+        "description": "Notification channel: telegram, slack, log, or auto (auto-detect)"
       }
     }
   }

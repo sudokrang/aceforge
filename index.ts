@@ -1,6 +1,6 @@
 /**
  * AceForge — Self-Evolving Skill Engine for OpenClaw
- * v0.7.0: Phase 2 (Proactive Intelligence) + Phase 3 (Self-Validation)
+ * v0.7.1: Audit fixes — C1/H1/H2/H3/H4/H5/M7 applied
  *
  * Phase 1: Core engine (v0.1–v0.6.1) — pattern detection, skill crystallization, lifecycle
  * Phase 2: Proactive intelligence — capability tree, cross-session propagation, composition,
@@ -136,6 +136,8 @@ function buildPlugin() {
     name: "AceForge",
     description: "Self-evolving skill engine — detects patterns, crystallizes skills, manages lifecycle",
 
+    // H5 fix: removed maxCustomSkillTokens (dead — nothing reads it).
+    // Canonical schema lives in openclaw.plugin.json; this is for compat shim only.
     configSchema: {
       type: "object" as const,
       additionalProperties: false,
@@ -143,7 +145,6 @@ function buildPlugin() {
         crystallizationThreshold: { type: "number" as const, default: 3 },
         successRateMinimum: { type: "number" as const, default: 0.7 },
         retirementDays: { type: "number" as const, default: 30 },
-        maxCustomSkillTokens: { type: "number" as const, default: 3000 },
         notificationChannel: { type: "string" as const, default: "auto" },
       }
     },
@@ -275,36 +276,96 @@ function buildPlugin() {
       api.on("agent_end", (_event: any, _ctx: any) => {
         resetLlmRateLimit();
 
-        // Phase 1: Core pattern analysis
+        // Phase 1: Core pattern analysis (async — non-blocking)
         analyzePatterns().catch((err: Error) =>
           log.error(`[aceforge] pattern analysis error: ${err.message}`)
         );
 
-        // Phase 2: Cross-session merge + capability tree rebuild
-        try { mergePatterns(); } catch (err) {
-          log.error(`[aceforge] cross-session merge error: ${(err as Error).message}`);
-        }
-        try { buildCapabilityTree(); } catch (err) {
-          log.error(`[aceforge] capability tree error: ${(err as Error).message}`);
-        }
-
-        // Phase 2: Proactive behavior gap detection
-        try {
-          const behaviorGaps = summarizeBehaviorGaps();
-          if (behaviorGaps.length > 0) {
-            const criticalGaps = behaviorGaps.filter(g => g.count >= 5);
-            if (criticalGaps.length > 0) {
-              notify(
-                `Proactive Gap Alert\n` +
-                `${criticalGaps.length} critical behavior gap(s):\n` +
-                criticalGaps.map(g => `${g.domain}: ${g.gapType} (${g.count}x)`).join("\n")
-              ).catch(() => {});
-            }
+        // M7 fix: Phase 2 intelligence runs non-blocking via setImmediate
+        setImmediate(() => {
+          // Phase 2B: Cross-session merge
+          try { mergePatterns(); } catch (err) {
+            log.error(`[aceforge] cross-session merge error: ${(err as Error).message}`);
           }
-          updateTreeWithBehaviorGaps();
-        } catch (err) {
-          log.error(`[aceforge] behavior gap detection error: ${(err as Error).message}`);
-        }
+
+          // Phase 2A: Capability tree rebuild
+          try { buildCapabilityTree(); } catch (err) {
+            log.error(`[aceforge] capability tree error: ${(err as Error).message}`);
+          }
+
+          // Phase 2D: Proactive behavior gap detection
+          try {
+            const behaviorGaps = summarizeBehaviorGaps();
+            if (behaviorGaps.length > 0) {
+              const criticalGaps = behaviorGaps.filter(g => g.count >= 5);
+              if (criticalGaps.length > 0) {
+                notify(
+                  `Proactive Gap Alert\n` +
+                  `${criticalGaps.length} critical behavior gap(s):\n` +
+                  criticalGaps.map(g => `${g.domain}: ${g.gapType} (${g.count}x)`).join("\n")
+                ).catch(() => {});
+              }
+            }
+            updateTreeWithBehaviorGaps();
+          } catch (err) {
+            log.error(`[aceforge] behavior gap detection error: ${(err as Error).message}`);
+          }
+
+          // H1 fix: Phase 2F — Route recent corrections to auto-adjust
+          try {
+            const pFile = path.join(FORGE_DIR, "patterns.jsonl");
+            if (fs.existsSync(pFile)) {
+              const content = fs.readFileSync(pFile, "utf-8");
+              if (content.trim()) {
+                const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+                const lines = content.trim().split("\n").filter(l => l.trim());
+                const recentCorrections: Array<{ text: string; session: string | null }> = [];
+                const recentToolCalls: Array<{ tool: string; ts: number; args: string | null; session: string | null }> = [];
+
+                // Only scan last 100 entries for performance
+                for (const line of lines.slice(-100)) {
+                  try {
+                    const entry = JSON.parse(line);
+                    const entryTime = new Date(entry.ts).getTime();
+                    if (entryTime < fiveMinAgo) continue;
+
+                    if (entry.type === "correction" && entry.text_fragment) {
+                      recentCorrections.push({
+                        text: entry.text_fragment || "",
+                        session: entry.session || null,
+                      });
+                    } else if (entry.tool && entry.type !== "chain" && entry.type !== "correction") {
+                      recentToolCalls.push({
+                        tool: entry.tool,
+                        ts: entryTime,
+                        args: entry.args_summary || null,
+                        session: entry.session || null,
+                      });
+                    }
+                  } catch { /* skip malformed */ }
+                }
+
+                // For each recent correction, find nearest preceding tool call and route to auto-adjust
+                for (const corr of recentCorrections) {
+                  const nearestTool = recentToolCalls
+                    .filter(t => !corr.session || t.session === corr.session)
+                    .sort((a, b) => b.ts - a.ts)[0];
+
+                  if (nearestTool) {
+                    handleCorrectionForSkill(
+                      nearestTool.tool,
+                      corr.text.slice(0, 200),
+                      nearestTool.args,
+                      corr.session
+                    );
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            log.error(`[aceforge] auto-adjust routing error: ${(err as Error).message}`);
+          }
+        }); // end setImmediate
       });
 
       // ══════════════════════════════════════════════════════════════
@@ -429,37 +490,13 @@ function buildPlugin() {
         },
       });
 
-      // Phase 2: Gap detection as standalone tool
+      // H4 fix: forge_gaps tool returns same unified output as the command
       api.registerTool({
         name: "forge_gaps",
-        description: "Detect capability gaps from failure patterns, corrections, and behavior analysis.",
+        description: "Detect all capability gaps: tool failures, behavior patterns (fallback/deferral/uncertainty), and cross-session candidates.",
         parameters: { type: "object", properties: {} },
         async execute() {
-          const gaps = detectGaps();
-          const behaviorGaps = summarizeBehaviorGaps();
-          const crossSession = getCrossSessionCandidates();
-          let text = "";
-          if (gaps.length > 0) {
-            text += `Tool Gaps (${gaps.length}):\n`;
-            for (const g of gaps.slice(0, 5)) {
-              text += `  ${g.tool}: ${g.gapType} (severity ${g.severity})\n`;
-            }
-            text += "\n";
-          }
-          if (behaviorGaps.length > 0) {
-            text += `Behavior Gaps (${behaviorGaps.length}):\n`;
-            for (const bg of behaviorGaps.slice(0, 5)) {
-              text += `  ${bg.domain}: ${bg.gapType} (${bg.count}x)\n`;
-            }
-            text += "\n";
-          }
-          if (crossSession.length > 0) {
-            text += `Cross-Session Candidates (${crossSession.length}):\n`;
-            for (const cs of crossSession.slice(0, 5)) {
-              text += `  ${cs.tool}: ${cs.detail}\n`;
-            }
-          }
-          if (!text) text = "No gaps detected.";
+          const text = buildUnifiedGapReport();
           return { content: [{ type: "text", text }] };
         },
       });
@@ -468,7 +505,7 @@ function buildPlugin() {
       // SLASH COMMANDS
       // ══════════════════════════════════════════════════════════════
 
-      // ── Phase 1 commands (preserved from v0.6.1) ──────────────────
+      // ── Phase 1 commands ──────────────────────────────────────────
 
       api.registerCommand({
         name: "forge_approve", description: "Approve a proposed skill for deployment", acceptsArgs: true,
@@ -583,17 +620,11 @@ function buildPlugin() {
         }
       });
 
+      // H4 fix: unified forge_gaps command — shows tool gaps + behavior gaps + cross-session
       api.registerCommand({
-        name: "forge_gaps", description: "Show detected capability gaps", acceptsArgs: false,
+        name: "forge_gaps", description: "Show all detected capability gaps (tool + behavior + cross-session)", acceptsArgs: false,
         handler: async (_ctx: any) => {
-          const gaps = detectGaps();
-          if (gaps.length === 0) return { text: "No capability gaps detected." };
-          let text = `AceForge Gap Analysis\n\n${gaps.length} gap(s):\n\n`;
-          for (const gap of gaps) {
-            const sev = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
-            text += `${gap.tool} (${sev})\n  Type: ${gap.gapType.replace(/_/g, " ")}\n  ${gap.evidence.slice(0, 2).join("\n  ")}\n\n`;
-          }
-          return { text };
+          return { text: buildUnifiedGapReport() };
         }
       });
 
@@ -723,9 +754,52 @@ function buildPlugin() {
         handler: async (_ctx: any) => { return { text: formatAdversarialReport() }; }
       });
 
-      log.info("[aceforge] v0.7.0 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
+      log.info("[aceforge] v0.7.1 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
     }
   };
+}
+
+// ─── H4 fix: shared gap report builder used by both tool and command ────
+function buildUnifiedGapReport(): string {
+  const gaps = detectGaps();
+  const behaviorGaps = summarizeBehaviorGaps();
+  const crossSession = getCrossSessionCandidates();
+
+  if (gaps.length === 0 && behaviorGaps.length === 0 && crossSession.length === 0) {
+    return "No capability gaps detected.";
+  }
+
+  let text = `AceForge Gap Analysis\n\n`;
+
+  if (gaps.length > 0) {
+    text += `Tool Gaps (${gaps.length}):\n`;
+    for (const gap of gaps) {
+      const sev = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
+      text += `  ${gap.tool} (${sev}): ${gap.gapType.replace(/_/g, " ")}\n`;
+      text += `    ${gap.evidence.slice(0, 2).join("; ")}\n`;
+    }
+    text += `\n`;
+  }
+
+  if (behaviorGaps.length > 0) {
+    text += `Behavior Gaps (${behaviorGaps.length}):\n`;
+    for (const bg of behaviorGaps.slice(0, 5)) {
+      const icon = bg.gapType === "fallback" ? "🔴" : bg.gapType === "deferral" ? "🟡" : "🟠";
+      text += `  ${icon} ${bg.domain}: ${bg.gapType} (${bg.count}x)\n`;
+    }
+    text += `\n`;
+  }
+
+  if (crossSession.length > 0) {
+    text += `Cross-Session Candidates (${crossSession.length}):\n`;
+    for (const cs of crossSession.slice(0, 5)) {
+      text += `  ${cs.tool}: ${cs.detail}\n`;
+    }
+    text += `\n`;
+  }
+
+  text += `Generate remediation: /forge_gap_propose`;
+  return text;
 }
 
 export default buildPlugin();
