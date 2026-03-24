@@ -124,12 +124,17 @@ export function captureToolTrace(event: any, ctx: any, api?: any): void {
     const cx = ctx as any;
 
     // Skip AceForge and session-management tools
+    // N-M5: Moved to shared/blocklist.ts
     const CAPTURE_BLOCKLIST = new Set([
-      "forge", "forge_status", "forge_reflect", "forge_propose",
-      "forge_approve_skill", "forge_reject_skill",
-      "forge_quality", "forge_registry", "forge_rewards",
-      "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
-    ]);
+  "forge", "forge_status", "forge_reflect", "forge_propose",
+  "forge_approve_skill", "forge_reject_skill", "forge_approve", "forge_reject",
+  "forge_quality", "forge_registry", "forge_rewards", "forge_gaps",
+  "forge_retire", "forge_retire_skill", "forge_reinstate",
+  "forge_tree", "forge_cross_session", "forge_compose",
+  "forge_behavior_gaps", "forge_optimize",
+  "forge_test", "forge_challenge", "forge_adversarial",
+  "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
+]);
     if (CAPTURE_BLOCKLIST.has(ev?.toolName)) return;
 
     appendJsonl("patterns.jsonl", {

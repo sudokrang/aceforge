@@ -1,23 +1,17 @@
 /**
  * Skill validator — security-hardened SKILL.md validation
  *
- * v0.6.0 fixes:
- *  - M5: similarity uses Jaccard+bigram hybrid (was degenerate TF-IDF with N=2)
- *  - G1: detects SOUL.md/MEMORY.md write patterns (ClawHavoc attack vector)
+ * v0.7.2 fixes:
+ *   M6: Detect base64-encoded injection, homoglyph domains, env var exfil,
+ *        multi-line split injection
  */
 import * as fsSync from "fs";
 import * as path from "path";
 import * as os from "os";
 
-// ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
 const HOME = os.homedir() || process.env.HOME || "";
 
-const SKILLS_DIR = path.join(
-  HOME,
-  ".openclaw",
-  "workspace",
-  "skills"
-);
+const SKILLS_DIR = path.join(HOME, ".openclaw", "workspace", "skills");
 
 const ALLOWED_NET_DOMAINS = new Set([
   "api.telegram.org",
@@ -70,11 +64,43 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     }
   }
 
+  // M6 fix: Multi-line split injection detection
+  // Reassemble adjacent lines and check for injection phrases
+  // M6: skip multiline join on overlength skills (perf)
+  const joinedLines = lines.length > 300 ? "" : skillMd.replace(/\n\d+\.\s*/g, " ").replace(/\n-\s*/g, " ");
+  const splitInjectionPatterns = [
+    /ignore\s+previous\s+instructions/i,
+    /disregard\s+all\s+prior/i,
+  ];
+  for (const p of splitInjectionPatterns) {
+    if (p.test(joinedLines) && !p.test(skillMd)) {
+      // Only flag if caught in joined form but NOT already caught in original
+      errors.push(`Split injection detected across lines: ${p.toString()}`);
+    }
+  }
+
   // P1: Credential patterns
   if (/password\s*[:=]\s*["'][^"']{8,}/i.test(skillMd) ||
       /api[_-]?key\s*[:=]\s*["'][^"']{16,}/i.test(skillMd) ||
       /token\s*[:=]\s*["'][^"']{16,}/i.test(skillMd)) {
     errors.push("Potential credential in plaintext");
+  }
+
+  // M6 fix: Base64-encoded payload detection
+  if (/base64\s*(-d|--decode)?\s*\|\s*(sh|bash|exec|eval)/i.test(skillMd) ||
+      /echo\s+[A-Za-z0-9+/=]{20,}\s*\|\s*base64/i.test(skillMd) ||
+      /atob\s*\(\s*["'][A-Za-z0-9+/=]{16,}/i.test(skillMd)) {
+    errors.push("Base64-encoded payload piped to shell or eval");
+  }
+
+  // M6 fix: Environment variable exfiltration
+  if (/\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)[A-Z_]*/i.test(skillMd)) {
+    const envExfilContext = /(?:curl|wget|fetch|http|url).*\$[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)/i;
+    if (envExfilContext.test(skillMd)) {
+      errors.push("Environment variable exfiltration pattern detected");
+    } else {
+      warnings.push("References environment variables containing secrets — review for exfiltration");
+    }
   }
 
   // P1: Path traversal — check code-like lines for workspace escapes
@@ -85,7 +111,8 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     const looksLikePath = /^\s*[-`~\/.]/.test(line) || /`[^`]*\.\.[^`]*`/.test(line);
     if (!looksLikePath) continue;
     if (line.includes("../") || line.includes("~")) {
-      const resolved = path.resolve(workspaceBase, trimmed);
+      const cleanedPath = trimmed.replace(/[`'"]/g, "").trim();
+      const resolved = path.resolve(workspaceBase, cleanedPath);
       if (!resolved.startsWith(workspaceBase)) {
         errors.push(`Path traversal attempt detected: ${trimmed.slice(0, 50)}`);
       }
@@ -100,7 +127,6 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
   ];
   for (const mwp of memoryWritePatterns) {
     if (mwp.pattern.test(skillMd)) {
-      // Check if it's in a code block or instruction context suggesting write
       const writeContext = /(?:write|append|modify|echo\s+.*>>?\s*.*(?:SOUL|MEMORY|IDENTITY)\.md|fs\.(?:write|append))/i;
       if (writeContext.test(skillMd)) {
         errors.push(`Skill attempts to write to ${mwp.name} — potential persistence attack`);
@@ -110,9 +136,9 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     }
   }
 
-  // P1: Network domain allowlist
+  // P1: Network domain allowlist + M6: homoglyph detection
   const networkPatterns = [
-    /(?:https?:\/\/)([a-zA-Z0-9.-]+)/g,
+    /(?:https?:\/\/)([a-zA-Z0-9\u0400-\u04FF.-]+)/g,  // Extended to catch Cyrillic
     /curl\s+["'](https?:\/\/[^"']+)/gi,
     /wget\s+["'](https?:\/\/[^"']+)/gi,
   ];
@@ -124,6 +150,14 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     }
   }
   for (const domain of foundDomains) {
+    // M6 fix: Detect homoglyph/confusable characters in domain names
+    // Check if domain contains non-ASCII characters that look like ASCII
+    const hasNonAscii = /[^\x00-\x7F]/.test(domain);
+    if (hasNonAscii) {
+      errors.push(`Homoglyph/IDN domain detected: ${domain} — potential phishing`);
+      continue;
+    }
+
     if (!ALLOWED_NET_DOMAINS.has(domain) && !domain.endsWith(".local")) {
       warnings.push(`Unrecognized network domain: ${domain}`);
     }
@@ -139,7 +173,7 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
   if (descMatch) {
     const existing = listExistingSkills();
     for (const ex of existing) {
-      if (ex.name === skillName) continue; // Don't compare against self
+      if (ex.name === skillName) continue;
       const similarity = hybridSimilarity(descMatch[1], ex.desc);
       if (similarity >= 0.95) {
         errors.push(
@@ -178,11 +212,6 @@ function listExistingSkills(): ExistingSkill[] {
   return skills;
 }
 
-/**
- * M5 fix: Hybrid Jaccard + bigram similarity
- * Replaces the degenerate TF-IDF that only computed IDF from 2 documents.
- * Stop-word filtering + bigram sequence overlap catches near-duplicates properly.
- */
 const STOP_WORDS = new Set([
   "the", "and", "for", "with", "this", "that", "from", "are", "was", "has",
   "use", "using", "when", "tool", "skill", "auto", "based", "data",
@@ -197,7 +226,6 @@ function hybridSimilarity(a: string, b: string): number {
   const tokensB = tokenizeClean(b);
   if (tokensA.length === 0 || tokensB.length === 0) return 0;
 
-  // Unigram Jaccard
   const setA = new Set(tokensA);
   const setB = new Set(tokensB);
   const union = new Set([...setA, ...setB]);
@@ -205,7 +233,6 @@ function hybridSimilarity(a: string, b: string): number {
   for (const t of setA) { if (setB.has(t)) intersection++; }
   const jaccard = intersection / union.size;
 
-  // Bigram Jaccard (catches sequence similarity)
   const bigramsA = new Set<string>();
   const bigramsB = new Set<string>();
   for (let i = 0; i < tokensA.length - 1; i++) bigramsA.add(tokensA[i] + " " + tokensA[i + 1]);
@@ -218,5 +245,4 @@ function hybridSimilarity(a: string, b: string): number {
   return 0.6 * jaccard + 0.4 * bigramScore;
 }
 
-// Backward-compatible export name
 export { hybridSimilarity as jaccardSimilarity };

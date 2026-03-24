@@ -1,9 +1,9 @@
 /**
  * Description Optimizer — Phase 2E
  *
- * Weekly cron that compares skill descriptions against actual user language from
- * recent conversations. Rewrites descriptions that don't match how users actually
- * phrase requests, ensuring skills stay findable as language evolves.
+ * v0.7.2 fix: M3 — topTokens now wired into suggestedDescription.
+ * The optimizer generates a suggested rewrite from conversation language tokens
+ * instead of always returning null.
  *
  * Research: SkillsBench (arXiv:2602.12670) — 56% of skills never invoked because
  * descriptions don't match user intent. Description IS the discovery mechanism.
@@ -106,7 +106,7 @@ export function detectDescriptionMismatches(threshold: number = 0.3): Descriptio
       const overlap = computeOverlap(descTokens, allFragTokens);
 
       if (overlap < threshold) {
-        // Find the most common tokens from conversation fragments
+        // M3 fix: compute top conversation tokens and generate suggested description
         const tokenCounts = new Map<string, number>();
         for (const frag of fragments) {
           for (const t of tokenize(frag)) {
@@ -118,12 +118,24 @@ export function detectDescriptionMismatches(threshold: number = 0.3): Descriptio
           .slice(0, 8)
           .map(([t]) => t);
 
+        // Generate a suggested description from the top conversation tokens
+        // Preserve any existing action verb from the current description
+        const currentVerb = currentDesc.split(/\s+/)[0]?.toLowerCase() || "";
+        const actionVerbs = ["use", "run", "execute", "deploy", "configure", "manage", "handle",
+          "process", "generate", "create", "build", "check", "verify", "search", "fetch",
+          "extract", "parse", "monitor", "debug", "fix", "install", "update", "clean"];
+        const verb = actionVerbs.includes(currentVerb) ? currentDesc.split(/\s+/)[0] : "Handle";
+
+        const suggestedDescription = topTokens.length >= 3
+          ? `${verb} ${topTokens.slice(0, 5).join(", ")} operations for ${toolPrefix}`
+          : null;
+
         mismatches.push({
           skill,
           currentDescription: currentDesc,
           tokenOverlap: Math.round(overlap * 100) / 100,
           conversationFragments: fragments.slice(0, 5),
-          suggestedDescription: null, // LLM generates this during optimization
+          suggestedDescription,
         });
       }
     } catch { /* skip unreadable */ }
@@ -149,6 +161,9 @@ export function formatOptimizationReport(): string {
     text += `${m.skill} — ${Math.round(m.tokenOverlap * 100)}% overlap\n`;
     text += `  Current: "${m.currentDescription.slice(0, 80)}"\n`;
     text += `  User says: "${m.conversationFragments[0]?.slice(0, 60) || ""}"\n`;
+    if (m.suggestedDescription) {
+      text += `  Suggested: "${m.suggestedDescription}"\n`;
+    }
     text += `  → Run /forge_optimize ${m.skill} to rewrite description from conversation data\n\n`;
   }
 

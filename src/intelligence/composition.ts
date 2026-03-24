@@ -1,8 +1,9 @@
 /**
  * Skill Composition — Phase 2C
  *
- * Detects when two skills frequently co-activate in the same session and proposes
- * composed skills that chain them with explicit data flow.
+ * v0.7.2 fix: N-H3 — removed skill-health.jsonl existence gate that blocked
+ * co-activation detection when no health entries existed yet. Session data
+ * comes from patterns.jsonl, not skill-health.jsonl.
  *
  * Research: AgentSkillOS (arXiv:2603.02176) — DAG-based pipelines "substantially
  * outperform native flat invocation even when given the identical skill set."
@@ -11,7 +12,7 @@
 import * as os from "os";
 import * as fsSync from "fs";
 import * as path from "path";
-import { getHealthEntries, listActiveSkills } from "../skill/lifecycle.js";
+import { listActiveSkills } from "../skill/lifecycle.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
 const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
@@ -38,38 +39,31 @@ export interface CompositionCandidate {
 
 // ─── Co-Activation Detection ────────────────────────────────────────────
 
+// N-H3 fix: removed skill-health.jsonl gate — session activations come from patterns.jsonl
 function loadSessionActivations(): Map<string, Map<string, number>> {
-  const healthFile = path.join(FORGE_DIR, "skill-health.jsonl");
-  if (!fsSync.existsSync(healthFile)) return new Map();
-
-  const content = fsSync.readFileSync(healthFile, "utf-8");
-  if (!content.trim()) return new Map();
-
-  // Map<session, Map<skill, activationCount>>
-  const sessionSkills = new Map<string, Map<string, number>>();
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-  // Also load patterns for session context
-  const patternsFile = path.join(FORGE_DIR, "patterns.jsonl");
-  const patterns: Array<{ ts: string; tool: string; session: string }> = [];
-  if (fsSync.existsSync(patternsFile)) {
-    const pContent = fsSync.readFileSync(patternsFile, "utf-8");
-    for (const line of pContent.trim().split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        const e = JSON.parse(line);
-        if (e.session && e.tool && new Date(e.ts).getTime() >= cutoff) {
-          patterns.push(e);
-        }
-      } catch { /* skip */ }
-    }
-  }
+  // Map<session, Map<tool, activationCount>>
+  const sessionSkills = new Map<string, Map<string, number>>();
 
-  // Group tool calls by session
-  for (const p of patterns) {
-    if (!sessionSkills.has(p.session)) sessionSkills.set(p.session, new Map());
-    const skills = sessionSkills.get(p.session)!;
-    skills.set(p.tool, (skills.get(p.tool) || 0) + 1);
+  const patternsFile = path.join(FORGE_DIR, "patterns.jsonl");
+  if (!fsSync.existsSync(patternsFile)) return sessionSkills;
+
+  const pContent = fsSync.readFileSync(patternsFile, "utf-8");
+  if (!pContent.trim()) return sessionSkills;
+
+  for (const line of pContent.trim().split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const e = JSON.parse(line);
+      if (!e.session || !e.tool) continue;
+      if (e.type === "correction" || e.type === "chain") continue;
+      if (new Date(e.ts).getTime() < cutoff) continue;
+
+      if (!sessionSkills.has(e.session)) sessionSkills.set(e.session, new Map());
+      const skills = sessionSkills.get(e.session)!;
+      skills.set(e.tool, (skills.get(e.tool) || 0) + 1);
+    } catch { /* skip */ }
   }
 
   return sessionSkills;

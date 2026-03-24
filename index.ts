@@ -1,6 +1,6 @@
 /**
  * AceForge — Self-Evolving Skill Engine for OpenClaw
- * v0.7.1: Audit fixes — C1/H1/H2/H3/H4/H5/M7 applied
+ * v0.7.2: Audit fixes — C1/H1/H2/H3/H4/H5/M7 applied
  *
  * Phase 1: Core engine (v0.1–v0.6.1) — pattern detection, skill crystallization, lifecycle
  * Phase 2: Proactive intelligence — capability tree, cross-session propagation, composition,
@@ -754,7 +754,7 @@ function buildPlugin() {
         handler: async (_ctx: any) => { return { text: formatAdversarialReport() }; }
       });
 
-      log.info("[aceforge] v0.7.1 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
+      log.info("[aceforge] v0.7.2 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
     }
   };
 }

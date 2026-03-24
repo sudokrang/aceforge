@@ -1,11 +1,10 @@
 /**
  * OpenViking context engine client (optional integration)
  *
- * Available for use when OpenViking is running alongside OpenClaw.
- * Not required for core AceForge functionality.
+ * v0.7.2 fix: M5 — searchViking accepts optional target_uri parameter
+ * for scoped searches (e.g., "viking://user/memories/").
  *
  * Circuit breaker: 5s timeout, 3 failures → open for 10 min.
- * Import and call searchViking() from any module that needs Viking context.
  */
 const VIKING_URL = process.env.ACEFORGE_VIKING_URL || "http://127.0.0.1:1933";
 const TIMEOUT_MS = 5000;
@@ -35,7 +34,7 @@ function isCircuitOpen(): boolean {
   return true;
 }
 
-async function vikingQuery(query: string): Promise<unknown> {
+async function vikingQuery(query: string, targetUri?: string): Promise<unknown> {
   if (isCircuitOpen()) {
     throw new Error("Circuit breaker is OPEN — Viking queries suppressed for 10 min");
   }
@@ -44,10 +43,14 @@ async function vikingQuery(query: string): Promise<unknown> {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
+    // M5 fix: include target_uri for scoped searches
+    const body: Record<string, string> = { query };
+    if (targetUri) body.target_uri = targetUri;
+
     const res = await fetch(`${VIKING_URL}/api/v1/search/find`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -70,9 +73,9 @@ async function vikingQuery(query: string): Promise<unknown> {
   }
 }
 
-export async function searchViking(query: string): Promise<unknown | null> {
+export async function searchViking(query: string, targetUri?: string): Promise<unknown | null> {
   try {
-    const result = await vikingQuery(query);
+    const result = await vikingQuery(query, targetUri);
     return result ?? null;
   } catch (err) {
     console.error(`[aceforge/viking] query failed: ${(err as Error).message}`);

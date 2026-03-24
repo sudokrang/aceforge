@@ -1,11 +1,9 @@
 /**
  * Pattern analysis engine
- * Reads patterns.jsonl, groups by tool+args, identifies crystallization candidates.
- * On new candidates: LLM generates SKILL.md, reviewer critiques, validator checks, notifies.
  *
- * v0.6.0 fixes:
- *  - H5: evolution and upgrade paths are properly gated — evolution no longer blocks upgrades
- *  - M3: dedup check verifies proposal/skill actually exists (expired proposals no longer block)
+ * v0.7.2 fixes:
+ *   N-M1: bundledTools dedup now parses YAML frontmatter (was trying JSON regex)
+ *   N-M5: uses shared ACEFORGE_TOOL_BLOCKLIST
  */
 import * as fsSync from "fs";
 import * as path from "path";
@@ -20,14 +18,28 @@ import { scoreSkill } from "../skill/quality-score.js";
 import { llmJudgeEvaluate } from "../skill/llm-judge.js";
 import { getEffectiveCrystallizationThreshold, getHealthEntries } from "../skill/lifecycle.js";
 
+const ACEFORGE_TOOL_BLOCKLIST = new Set([
+  "forge", "forge_status", "forge_reflect", "forge_propose",
+  "forge_approve_skill", "forge_reject_skill", "forge_quality",
+  "forge_approve", "forge_reject", "forge_retire", "forge_reinstate",
+  "forge_registry", "forge_rewards", "forge_gaps",
+  "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
+  "process", "message", "notify",
+]);
+
+const SELF_TOOLS = new Set([
+  "exec", "write", "edit", "delete", "move", "copy",
+  "read", "pdf", "image", "browser", "web_fetch", "web_search",
+  "session_send", "sessions_send", "broadcast",
+  "message", "notify", "process", "exec-ssh",
+  "memory_search", "memory_recall", "memory_store",
+  "file_head", "file_write", "file_read",
+  ...ACEFORGE_TOOL_BLOCKLIST,
+]);
+
 const HOME = os.homedir() || process.env.HOME || "";
 
-const FORGE_DIR = path.join(
-  HOME,
-  ".openclaw",
-  "workspace",
-  ".forge"
-);
+const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
 const SKILLS_DIR = path.join(HOME, ".openclaw", "workspace", "skills");
 const PROPOSALS_DIR = path.join(FORGE_DIR, "proposals");
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -68,28 +80,6 @@ function readPatternsFile(): PatternEntry[] {
     .filter(Boolean) as PatternEntry[];
 }
 
-const FORGE_TOOL_BLOCKLIST = new Set([
-  "forge", "forge_status", "forge_reflect", "forge_propose",
-  "forge_approve_skill", "forge_reject_skill",
-  "forge_quality", "forge_registry", "forge_rewards",
-  "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
-  "process",
-]);
-
-const SELF_TOOLS = new Set([
-  "exec", "write", "edit", "delete", "move", "copy",
-  "read", "pdf", "image", "browser", "web_fetch", "web_search",
-  "session_send", "sessions_send", "broadcast",
-  "forge", "forge_reflect", "forge_propose", "forge_status",
-  "forge_approve_skill", "forge_reject_skill", "forge_approve", "forge_reject",
-  "forge_retire", "forge_retire_skill", "forge_reinstate",
-  "forge_quality", "forge_registry", "forge_rewards",
-  "message", "notify",
-  "process", "exec-ssh",
-  "memory_search", "memory_recall", "memory_store",
-  "file_head", "file_write", "file_read",
-]);
-
 function groupPatterns(patterns: PatternEntry[]): Map<string, PatternEntry[]> {
   const groups = new Map<string, PatternEntry[]>();
   const cutoff = Date.now() - THIRTY_DAYS_MS;
@@ -97,7 +87,7 @@ function groupPatterns(patterns: PatternEntry[]): Map<string, PatternEntry[]> {
   for (const p of patterns) {
     if (p.type === "correction") continue;
     if (new Date(p.ts).getTime() < cutoff) continue;
-    if (FORGE_TOOL_BLOCKLIST.has(p.tool)) continue;
+    if (ACEFORGE_TOOL_BLOCKLIST.has(p.tool)) continue;
 
     const key = p.tool;
     if (!groups.has(key)) groups.set(key, []);
@@ -113,7 +103,7 @@ function groupPatterns(patterns: PatternEntry[]): Map<string, PatternEntry[]> {
 
 /**
  * M3 fix: Check if a tool has an ACTIVE proposal or deployed skill.
- * Expired proposals (directory removed) no longer block re-proposal.
+ * N-M1 fix: bundledTools parsed from YAML frontmatter, not JSON.
  */
 function hasActiveProposalOrSkill(tool: string): boolean {
   // Check proposals directory
@@ -129,8 +119,8 @@ function hasActiveProposalOrSkill(tool: string): boolean {
       catch { return false; }
     })) return true;
   }
-  // M3-fix: Also check if any installed workspace skill explicitly declares it wraps this tool
-  // (skill name may differ from tool name, e.g. "tavily" skill wraps "tavily_search" tool)
+  // N-M1 fix: Check if any installed skill explicitly wraps this tool via bundledTools
+  // SKILL.md uses YAML frontmatter, not JSON — parse accordingly
   if (fsSync.existsSync(SKILLS_DIR)) {
     const skills = fsSync.readdirSync(SKILLS_DIR);
     for (const s of skills) {
@@ -140,17 +130,32 @@ function hasActiveProposalOrSkill(tool: string): boolean {
         const mdPath = path.join(skillPath, "SKILL.md");
         if (!fsSync.existsSync(mdPath)) continue;
         const content = fsSync.readFileSync(mdPath, "utf-8");
-        const match = content.match(/^metadata:\s*(\{.*\})/ms);
-        if (!match) continue;
-        try {
-          const md = JSON.parse(match[1]);
-          // Check bundledTools array in metadata (recommended approach)
-          if (md?.openclaw?.bundledTools?.includes?.(tool)) return true;
-          // Fallback: check if description mentions the tool (heuristic)
-          if (md?.openclaw?.description &&
-              typeof md.openclaw.description === "string" &&
-              md.openclaw.description.toLowerCase().includes(tool.replace(/_/g, " ").toLowerCase())) return true;
-        } catch { /* invalid JSON in metadata */ }
+
+        // Parse bundledTools from YAML frontmatter:
+        //   bundledTools: [tavily_search, tavily_extract]
+        // or:
+        //   bundledTools:
+        //     - tavily_search
+        //     - tavily_extract
+        const inlineMatch = content.match(/bundledTools:\s*\[([^\]]+)\]/);
+        if (inlineMatch) {
+          const tools = inlineMatch[1].split(",").map(t => t.trim().replace(/['"]/g, ""));
+          if (tools.includes(tool)) return true;
+        }
+        // Multi-line YAML array
+        const multiLineMatch = content.match(/bundledTools:\s*\n((?:\s+-\s+\S+\n?)+)/);
+        if (multiLineMatch) {
+          const tools = multiLineMatch[1].split("\n")
+            .map(l => l.replace(/^\s*-\s*/, "").trim().replace(/['"]/g, ""))
+            .filter(Boolean);
+          if (tools.includes(tool)) return true;
+        }
+
+        // Fallback: check if description mentions the tool (heuristic)
+        const descMatch = content.match(/^description:\s*["']?(.+?)["']?$/m);
+        if (descMatch && descMatch[1].toLowerCase().includes(tool.replace(/_/g, " ").toLowerCase())) {
+          return true;
+        }
       } catch { /* skip unreadable skills */ }
     }
   }
@@ -188,7 +193,6 @@ export async function analyzePatterns(): Promise<void> {
     console.log(`[aceforge] diminishing returns active — threshold raised to ${effectiveThreshold}`);
   }
 
-  // M3 fix: only track tools that have ACTUAL active proposals or skills
   const existingCandidates = readCandidatesFile();
   const existingCandidateTools = new Set(existingCandidates.map(c => c.tool));
 
@@ -263,7 +267,6 @@ export async function analyzePatterns(): Promise<void> {
 
       // H5 fix: If evolution didn't fire, fall through to upgrade scoring
       if (!evolutionProposed) {
-        // ═══ Path 2: Upgrade — deployed skill scores < 60 ═══
         try {
           const existingPath = path.join(SKILLS_DIR, deployedSkill, "SKILL.md");
           const existingMd = fsSync.readFileSync(existingPath, "utf-8");
@@ -274,7 +277,6 @@ export async function analyzePatterns(): Promise<void> {
             continue;
           }
 
-          // Score < 60: check ambiguous zone (40-70) with LLM judge
           let finalScore = report.combined;
           let judgeReasoning = "";
           if (report.combined >= 40 && report.combined < 70) {
@@ -293,7 +295,6 @@ export async function analyzePatterns(): Promise<void> {
             }
           }
 
-          // Score < 60: propose upgrade
           console.log(`[aceforge] ${deployedSkill} scores ${finalScore}/100 — proposing upgrade`);
 
           const upgradeName = deployedSkill + "-upgrade";
@@ -337,14 +338,13 @@ export async function analyzePatterns(): Promise<void> {
           console.error(`[aceforge] upgrade scoring error: ${(err as Error).message}`);
         }
       }
-      continue; // Deployed skill handled — either evolved, upgraded, or adequate
+      continue;
     }
 
     // ═══ Path 3: New skill proposal — no deployed skill exists ═══
 
     if (successRate < SUCCESS_RATE_MIN) continue;
 
-    // M3 fix: check if active proposal exists (not just in candidates.jsonl)
     if (hasExistingProposal(key)) {
       console.log(`[aceforge] skipping ${key} — proposal already exists`);
       continue;
@@ -503,9 +503,7 @@ export async function analyzePatterns(): Promise<void> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Chain-to-Workflow Skill Proposals
-// ═══════════════════════════════════════════════════════════════════
+// ═══ Chain-to-Workflow Skill Proposals ═══
 
 async function analyzeChains(patterns: PatternEntry[]): Promise<void> {
   const chains = patterns.filter(p => p.type === "chain" && Array.isArray(p.tools));
@@ -582,9 +580,7 @@ async function analyzeChains(patterns: PatternEntry[]): Promise<void> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Gap Analysis → Remediation Skill Proposals
-// ═══════════════════════════════════════════════════════════════════
+// ═══ Gap Analysis → Remediation Skill Proposals ═══
 
 async function analyzeGaps(preloadedPatterns?: PatternEntry[]): Promise<void> {
   const gaps = detectGaps(preloadedPatterns);

@@ -1,9 +1,11 @@
 /**
  * Autonomous Skill Adjustment — Phase 2F
  *
- * Micro-revisions from corrected args: when Ace's correctedArgs system detects
- * a correction, this module matches it to the active skill and appends a
- * micro-revision to the skill's anti-patterns or instructions.
+ * v0.7.2 fixes:
+ *   N-H1: handleCorrectionForSkill now accepts correctionText (not "correctedArgs")
+ *         and generates human-readable anti-patterns
+ *   N-M2: invalidateHealthCache called after successful revision
+ *   M4:   TypeScript strict-safe — no `unknown` index access
  *
  * Micro-revisions are immediate (no approval). 3+ micro-revisions trigger
  * a full LLM rewrite (with approval).
@@ -14,7 +16,7 @@
 import * as os from "os";
 import * as fsSync from "fs";
 import * as path from "path";
-import { getHealthEntries, invalidateHealthCache } from "../skill/lifecycle.js";
+import { invalidateHealthCache } from "../skill/lifecycle.js";
 import { notify } from "../notify.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
@@ -72,6 +74,9 @@ export function applyMicroRevision(
 
     fsSync.writeFileSync(skillFile, lines.join("\n"), "utf-8");
 
+    // N-M2 fix: invalidate health cache after modifying skill
+    invalidateHealthCache(skillName);
+
     // Log the adjustment
     const entry: MicroRevision = { ...revision, ts: new Date().toISOString() };
     fsSync.appendFileSync(ADJUSTMENTS_FILE, JSON.stringify(entry) + "\n");
@@ -105,15 +110,19 @@ export function checkRewriteThreshold(skillName: string): boolean {
 }
 
 // ─── Handle Correction Event ────────────────────────────────────────────
+// N-H1 fix: parameters renamed for clarity. correctionText is the user's
+// natural language correction. originalArgs is the tool's original args JSON.
+// The generated anti-pattern is human-readable.
 
 export function handleCorrectionForSkill(
   toolName: string,
-  correctedArgs: string | null,
-  failedArgs: string | null,
+  correctionText: string | null,
+  originalArgs: string | null,
   session: string | null
 ): void {
   // Find the skill associated with this tool
   if (!fsSync.existsSync(SKILLS_DIR)) return;
+  if (!correctionText) return; // No actionable correction
 
   let matchedSkill: string | null = null;
   for (const skill of fsSync.readdirSync(SKILLS_DIR)) {
@@ -126,21 +135,35 @@ export function handleCorrectionForSkill(
 
   if (!matchedSkill) return;
 
-  // Build the revision content
+  // N-H1 fix: Build human-readable revision content
+  // correctionText = user's natural language correction (e.g., "no, actually use --rm flag")
+  // originalArgs = raw tool args JSON (e.g., {"command":"docker run nginx"})
   let revisionContent: string;
-  if (correctedArgs && failedArgs) {
-    revisionContent = `When using ${toolName}: use ${correctedArgs} (not ${failedArgs})`;
-  } else if (correctedArgs) {
-    revisionContent = `Corrected approach for ${toolName}: ${correctedArgs}`;
+
+  // Extract a clean summary of original args if available
+  let argSummary = "";
+  if (originalArgs) {
+    try {
+      const parsed = JSON.parse(originalArgs);
+      // Extract the most meaningful field
+      argSummary = parsed.command || parsed.path || parsed.query ||
+        (typeof parsed === "string" ? parsed : "").slice(0, 60);
+    } catch {
+      argSummary = originalArgs.slice(0, 60);
+    }
+  }
+
+  if (argSummary) {
+    revisionContent = `User correction for \`${toolName}\`: "${correctionText.slice(0, 120)}" (original: ${argSummary})`;
   } else {
-    return; // No actionable correction
+    revisionContent = `User correction for \`${toolName}\`: "${correctionText.slice(0, 150)}"`;
   }
 
   applyMicroRevision(matchedSkill, {
     skill: matchedSkill,
     type: "anti-pattern",
-    content: revisionContent.slice(0, 200),
-    source: "corrected_args",
+    content: revisionContent.slice(0, 250),
+    source: "user_correction",
     session,
   });
 

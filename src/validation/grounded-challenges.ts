@@ -1,11 +1,9 @@
 /**
  * Grounded Challenges — Phase 3B
  *
- * Generates realistic test scenarios from operational context (Viking or pattern data),
- * evaluates whether the right skills fire, and flags skills that fail challenges.
+ * v0.7.2 fix: M5 — Viking search now passes target_uri for scoped queries.
  *
  * Research: SE-Agent (arXiv:2508.02085) — curriculum generation for progressive testing.
- * EvoSkill (arXiv:2603.02766) — evaluate on held-out validation set.
  */
 import * as os from "os";
 import * as fsSync from "fs";
@@ -40,7 +38,6 @@ function generateFromPatterns(skillName: string): Challenge | null {
   const content = fsSync.readFileSync(patternsFile, "utf-8").trim();
   if (!content) return null;
 
-  // Find successful traces for this skill's tool
   const toolPrefix = skillName.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
   const successTraces: Array<{ args_summary: string; result_summary: string }> = [];
 
@@ -56,7 +53,6 @@ function generateFromPatterns(skillName: string): Challenge | null {
 
   if (successTraces.length === 0) return null;
 
-  // Pick a representative trace
   const trace = successTraces[Math.floor(Math.random() * successTraces.length)];
 
   return {
@@ -77,7 +73,11 @@ async function generateFromViking(skillName: string): Promise<Challenge | null> 
     if (!health.available) return null;
 
     const toolPrefix = skillName.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
-    const result = await searchViking(`recent ${toolPrefix} operations tasks`);
+    // M5 fix: scope Viking search to user memories for operational context
+    const result = await searchViking(
+      `recent ${toolPrefix} operations tasks`,
+      "viking://user/memories/"
+    );
     if (!result) return null;
 
     const context = typeof result === "string" ? result :
@@ -107,10 +107,8 @@ export async function generateChallenges(maxPerSkill: number = 2): Promise<Chall
 
   for (const skill of skills) {
     const stats = getSkillStats(skill);
-    // Only generate challenges for skills with some activation history
     if (stats.activations < 3) continue;
 
-    // Try Viking first, fall back to patterns
     let challenge = await generateFromViking(skill);
     if (!challenge) {
       challenge = generateFromPatterns(skill);
@@ -118,7 +116,6 @@ export async function generateChallenges(maxPerSkill: number = 2): Promise<Chall
 
     if (challenge) {
       challenges.push(challenge);
-      // Log the challenge
       try {
         fsSync.appendFileSync(CHALLENGES_FILE, JSON.stringify(challenge) + "\n");
       } catch { /* non-critical */ }

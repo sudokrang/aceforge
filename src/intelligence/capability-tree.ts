@@ -1,16 +1,17 @@
 /**
  * Capability Tree — Phase 2A
  *
- * Organizes skills into a hierarchical capability tree with gap scoring per domain.
- * Gap score = fallback_events / total_events. High gap = priority target for skill generation.
+ * v0.7.2 fix: M8 — domains with patterns but no skills now correctly count
+ * events for tools that classify into that domain. Previously, empty skill
+ * arrays caused countDomainEvents to miss all events, producing inaccurate
+ * gap scores of 0.
  *
- * Research: AgentSkillOS (arXiv:2603.02176) — recursive categorization into capability tree;
- * tree-based retrieval effectively approximates oracle skill selection at 200K+ skills.
+ * Research: AgentSkillOS (arXiv:2603.02176) — recursive categorization into capability tree.
  */
 import * as os from "os";
 import * as fsSync from "fs";
 import * as path from "path";
-import { getHealthEntries, listActiveSkills, getSkillStats } from "../skill/lifecycle.js";
+import { listActiveSkills, getSkillStats } from "../skill/lifecycle.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
 const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
@@ -81,7 +82,7 @@ function getSkillCategory(skillName: string): string {
   return classifyDomain(skillName, "");
 }
 
-// ─── Fallback/Deferral Event Counting ───────────────────────────────────
+// ─── Pattern Loading ────────────────────────────────────────────────────
 
 interface PatternEntry {
   ts: string;
@@ -92,6 +93,7 @@ interface PatternEntry {
   args_summary?: string;
   result_summary?: string;
   error?: string;
+  text_fragment?: string;
   [key: string]: unknown;
 }
 
@@ -109,17 +111,35 @@ function loadRecentPatterns(daysCutoff: number = 30): PatternEntry[] {
     .filter(p => new Date(p!.ts).getTime() >= cutoff) as PatternEntry[];
 }
 
-function countDomainEvents(patterns: PatternEntry[], domainSkills: string[]): { total: number; fallbacks: number } {
+// M8 fix: count events for a domain by skill match OR tool domain classification
+function countDomainEvents(
+  patterns: PatternEntry[],
+  domainSkills: string[],
+  domainName: string
+): { total: number; fallbacks: number } {
   let total = 0;
   let fallbacks = 0;
 
   for (const p of patterns) {
     if (p.type === "correction" || p.type === "chain") continue;
-    // Check if this tool is associated with a skill in this domain
-    const isInDomain = domainSkills.some(s => {
-      const prefix = s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
-      return prefix === p.tool || s === p.tool;
-    });
+    if (!p.tool) continue;
+
+    let isInDomain = false;
+
+    // Method 1: tool matches a skill in this domain
+    if (domainSkills.length > 0) {
+      isInDomain = domainSkills.some(s => {
+        const prefix = s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
+        return prefix === p.tool || s === p.tool;
+      });
+    }
+
+    // M8 fix: Method 2: if no skills in this domain, classify tool directly
+    if (!isInDomain && domainSkills.length === 0) {
+      const toolDomain = classifyDomain(p.tool, (p.args_summary as string) || "");
+      isInDomain = toolDomain === domainName;
+    }
+
     if (!isInDomain) continue;
     total++;
     if (!p.success) fallbacks++;
@@ -128,33 +148,30 @@ function countDomainEvents(patterns: PatternEntry[], domainSkills: string[]): { 
   return { total, fallbacks };
 }
 
-// ─── Gap Event Detection (fallback/deferral patterns) ───────────────────
+// ─── Fallback Pattern Counting ──────────────────────────────────────────
 
 function countFallbackPatterns(patterns: PatternEntry[]): Map<string, number> {
   const domainFallbacks = new Map<string, number>();
 
-  // Check for tool failures by domain
   for (const p of patterns) {
     if (p.type === "correction" || p.type === "chain") continue;
     if (!p.success && p.tool) {
-      const domain = classifyDomain(p.tool, p.args_summary || "");
+      const domain = classifyDomain(p.tool, (p.args_summary as string) || "");
       domainFallbacks.set(domain, (domainFallbacks.get(domain) || 0) + 1);
     }
   }
 
-  // Check for deferral/fallback text patterns in corrections
   const deferrals = patterns.filter(p => p.type === "correction");
   for (const d of deferrals) {
-    const text = (d.text_fragment || "").toLowerCase();
+    const text = ((d.text_fragment as string) || "").toLowerCase();
     const isDeferral = /can't do that|you'll need to|manually|let me know if|i'm not sure|not able to/i.test(text);
     if (isDeferral) {
-      // Associate with nearest tool call
       const nearbyTool = patterns.find(p =>
         p.type !== "correction" && p.session === d.session && p.tool &&
         Math.abs(new Date(p.ts).getTime() - new Date(d.ts).getTime()) < 120000
       );
       if (nearbyTool) {
-        const domain = classifyDomain(nearbyTool.tool, nearbyTool.args_summary || "");
+        const domain = classifyDomain(nearbyTool.tool, (nearbyTool.args_summary as string) || "");
         domainFallbacks.set(domain, (domainFallbacks.get(domain) || 0) + 1);
       }
     }
@@ -178,10 +195,13 @@ export function buildCapabilityTree(): CapabilityTree {
     domainSkills.get(domain)!.push(skill);
   }
 
-  // Also create entries for domains with patterns but no skills
+  // M8 fix: also create entries for domains with patterns but no skills,
+  // but ONLY if there are actual events for that domain
+  const domainHasEvents = new Map<string, boolean>();
   for (const p of patterns) {
     if (p.type === "correction" || p.type === "chain" || !p.tool) continue;
-    const domain = classifyDomain(p.tool, p.args_summary || "");
+    const domain = classifyDomain(p.tool, (p.args_summary as string) || "");
+    domainHasEvents.set(domain, true);
     if (!domainSkills.has(domain)) domainSkills.set(domain, []);
   }
 
@@ -198,12 +218,14 @@ export function buildCapabilityTree(): CapabilityTree {
       totalSuccesses += Math.round(stats.successRate * stats.activations);
     }
 
-    // Count domain-level events from patterns
-    const events = countDomainEvents(patterns, skills);
+    // M8 fix: pass domain name so empty-skill domains can classify by tool
+    const events = countDomainEvents(patterns, skills, domain);
     const fallbacks = domainFallbacks.get(domain) || 0;
-    const totalDomainEvents = Math.max(events.total, 1); // prevent div/0
 
-    // Gap score: proportion of events that were failures or fallbacks
+    // M8 fix: skip domains with no events AND no skills (true phantoms)
+    if (events.total === 0 && skills.length === 0) continue;
+
+    const totalDomainEvents = Math.max(events.total, 1);
     const gapScore = Math.round(((events.fallbacks + fallbacks) / totalDomainEvents) * 100) / 100;
 
     domains[domain] = {
@@ -222,7 +244,6 @@ export function buildCapabilityTree(): CapabilityTree {
     domains,
   };
 
-  // Persist to disk
   try {
     fsSync.writeFileSync(TREE_FILE, JSON.stringify(tree, null, 2), "utf-8");
   } catch (err) {
