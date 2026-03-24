@@ -40,6 +40,20 @@ const SELF_TOOLS = new Set([
   ...ACEFORGE_TOOL_BLOCKLIST,
 ]);
 
+// F2 fix: Native OpenClaw tools — never propose skills for these
+const NATIVE_TOOLS = new Set([
+  "exec", "write", "edit", "delete", "move", "copy",
+  "read", "pdf", "image", "browser", "web_fetch", "web_search",
+  "session_send", "sessions_send", "broadcast",
+  "message", "notify", "process", "exec-ssh",
+  "memory_search", "memory_recall", "memory_store",
+  "file_head", "file_write", "file_read",
+  "apply_patch", "grep", "glob", "list_directory",
+  "tavily_search", "tavily_extract",
+  ...ACEFORGE_TOOL_BLOCKLIST,
+]);
+
+
 const HOME = os.homedir() || process.env.HOME || "";
 
 const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
@@ -174,6 +188,40 @@ function findDeployedSkill(tool: string): string | null {
   }) || null;
 }
 
+
+/** F1 fix: Check if any existing PROPOSAL already covers this tool */
+function hasProposalForSameTool(tool: string): string | null {
+  if (!fsSync.existsSync(PROPOSALS_DIR)) return null;
+  for (const proposalName of fsSync.readdirSync(PROPOSALS_DIR)) {
+    const propDir = path.join(PROPOSALS_DIR, proposalName);
+    try {
+      if (!fsSync.statSync(propDir).isDirectory()) continue;
+      const mdPath = path.join(propDir, "SKILL.md");
+      if (!fsSync.existsSync(mdPath)) continue;
+      const content = fsSync.readFileSync(mdPath, "utf-8");
+
+      // Check bundledTools
+      const inlineMatch = content.match(/bundledTools:\s*\[([^\]]+)\]/);
+      if (inlineMatch) {
+        const tools = inlineMatch[1].split(",").map(t => t.trim().replace(/['"]/g, ""));
+        if (tools.includes(tool)) return proposalName;
+      }
+      const multiLineMatch = content.match(/bundledTools:\s*\n((?:\s+-\s+\S+\n?)+)/);
+      if (multiLineMatch) {
+        const tools = multiLineMatch[1].split("\n")
+          .map(l => l.replace(/^\s*-\s*/, "").trim().replace(/['"]/g, ""))
+          .filter(Boolean);
+        if (tools.includes(tool)) return proposalName;
+      }
+
+      // Check if proposal name maps to this tool
+      const prefix = proposalName.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
+      if (prefix === tool) return proposalName;
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
 /** Check if a proposal already exists for this name */
 function hasExistingProposal(name: string): boolean {
   if (!fsSync.existsSync(PROPOSALS_DIR)) return false;
@@ -203,8 +251,8 @@ export async function analyzePatterns(): Promise<void> {
 
   for (const [key, entries] of groups) {
     if (entries.length < effectiveThreshold) continue;
-    if (SELF_TOOLS.has(key)) {
-      console.log(`[aceforge] skipping self-tool: ${key}`);
+    if (NATIVE_TOOLS.has(key)) {
+      console.log(`[aceforge] skipping native/self tool: ${key}`);
       continue;
     }
 
@@ -350,6 +398,13 @@ export async function analyzePatterns(): Promise<void> {
 
     if (hasExistingProposal(key)) {
       console.log(`[aceforge] skipping ${key} — proposal already exists`);
+      continue;
+    }
+
+    // F1 fix: check if another proposal already covers this tool
+    const existingProposal = hasProposalForSameTool(key);
+    if (existingProposal) {
+      console.log(`[aceforge] skipping ${key} — already covered by proposal '${existingProposal}'`);
       continue;
     }
 
@@ -533,6 +588,23 @@ async function analyzeChains(patterns: PatternEntry[]): Promise<void> {
 
     if (findDeployedSkill(skillName)) continue;
     if (hasExistingProposal(skillName)) continue;
+
+    // F4 fix: compositionality filter — skip workflow proposals when all
+    // constituent tools individually have >80% success rate
+    const toolSuccessRates: number[] = [];
+    for (const t of tools) {
+      const toolEntries = patterns.filter(p =>
+        p.tool === t && p.type !== "correction" && p.type !== "chain"
+      );
+      if (toolEntries.length >= 3) {
+        const successes = toolEntries.filter(e => e.success).length;
+        toolSuccessRates.push(successes / toolEntries.length);
+      }
+    }
+    if (toolSuccessRates.length === tools.length && toolSuccessRates.every(r => r > 0.8)) {
+      console.log(`[aceforge] skipping workflow ${seqKey} — all tools individually >80% success, chain adds no value`);
+      continue;
+    }
 
     console.log(`[aceforge] workflow candidate: ${seqKey} (${entries.length}x, ${sessions.size} sessions)`);
 

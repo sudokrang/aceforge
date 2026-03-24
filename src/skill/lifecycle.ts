@@ -539,6 +539,63 @@ export function compareSkillVersions(
   };
 }
 
+
+// ─── F3 fix: Startup proposal revalidation ──────────────────────────
+// Re-evaluate existing proposals against current native tool list and dedup rules
+
+export function revalidateProposals(
+  nativeTools: Set<string>,
+  notifyFn?: (msg: string) => Promise<void>
+): string[] {
+  const proposalsDir = path.join(FORGE_DIR, "proposals");
+  if (!fsSync.existsSync(proposalsDir)) return [];
+
+  const removed: string[] = [];
+
+  for (const name of fsSync.readdirSync(proposalsDir)) {
+    const propDir = path.join(proposalsDir, name);
+    try {
+      if (!fsSync.statSync(propDir).isDirectory()) continue;
+    } catch { continue; }
+
+    // Extract the tool name from the proposal
+    const prefix = name.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
+
+    // Check if this proposal targets a native tool
+    if (nativeTools.has(prefix)) {
+      fsSync.rmSync(propDir, { recursive: true, force: true });
+      removed.push(name);
+      console.log(`[aceforge] revalidation: removed '${name}' — targets native tool '${prefix}'`);
+      if (notifyFn) {
+        notifyFn(`Proposal removed: ${name}\nReason: targets native OpenClaw tool '${prefix}'`);
+      }
+      continue;
+    }
+
+    // Check if proposal duplicates a deployed skill
+    if (fsSync.existsSync(SKILLS_DIR)) {
+      const skills = fsSync.readdirSync(SKILLS_DIR);
+      const duplicateSkill = skills.find(s => {
+        try {
+          if (!fsSync.statSync(path.join(SKILLS_DIR, s)).isDirectory()) return false;
+          const skillPrefix = s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
+          return skillPrefix === prefix;
+        } catch { return false; }
+      });
+      if (duplicateSkill && !name.includes("-upgrade") && !name.includes("-v")) {
+        fsSync.rmSync(propDir, { recursive: true, force: true });
+        removed.push(name);
+        console.log(`[aceforge] revalidation: removed '${name}' — duplicates deployed skill '${duplicateSkill}'`);
+        if (notifyFn) {
+          notifyFn(`Proposal removed: ${name}\nReason: duplicates deployed skill '${duplicateSkill}'`);
+        }
+      }
+    }
+  }
+
+  return removed;
+}
+
 // ─── Internal ───────────────────────────────────────────────────────────
 
 function logHealth(skill: string, action: string): void {

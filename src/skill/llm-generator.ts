@@ -224,6 +224,7 @@ function buildReviewPrompt(generatedMd: string): string {
 3. Could the description trigger false matches on unrelated tasks?
 4. Any security concerns (injection patterns, credential leaks, path traversal)?
 5. Is the Anti-Patterns section grounded in real failure data?
+6. TRIGGER PHRASE CHECK: The description field MUST read as a natural trigger phrase — how a user would request this task. If it reads as an imperative rule ("Before doing X, always Y") or a behavioral instruction ("When X fails, do Y"), respond REVISE with feedback to rewrite as a natural request phrase (e.g., "Execute remote commands via SSH on production servers").
 
 Respond with EXACTLY one of:
 - APPROVE: <one-line reason>

@@ -1,6 +1,6 @@
 /**
  * AceForge — Self-Evolving Skill Engine for OpenClaw
- * v0.7.4: Single /forge router — replaced 20 commands with subcommand dispatch — C1/H1/H2/H3/H4/H5/M7 applied
+ * v0.7.5: Proposal pipeline quality gates — F1-F5 — replaced 20 commands with subcommand dispatch — C1/H1/H2/H3/H4/H5/M7 applied
  *
  * Phase 1: Core engine (v0.1–v0.6.1) — pattern detection, skill crystallization, lifecycle
  * Phase 2: Proactive intelligence — capability tree, cross-session propagation, composition,
@@ -31,6 +31,7 @@ import {
   getSkillRegistry,
   getRewardSignals,
   runEffectivenessWatchdog,
+  revalidateProposals,
 } from "./src/skill/lifecycle.js";
 import { checkVikingHealth } from "./src/viking/client.js";
 import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";
@@ -223,6 +224,24 @@ function buildPlugin() {
           }
 
           expireOldProposals(notify);
+
+          // F3 fix: revalidate proposals against current native tool list
+          const STARTUP_NATIVE_TOOLS = new Set([
+            "exec", "write", "edit", "delete", "move", "copy",
+            "read", "pdf", "image", "browser", "web_fetch", "web_search",
+            "session_send", "sessions_send", "broadcast",
+            "message", "notify", "process", "exec-ssh",
+            "memory_search", "memory_recall", "memory_store",
+            "file_head", "file_write", "file_read",
+            "apply_patch", "grep", "glob", "list_directory",
+            "tavily_search", "tavily_extract",
+          ]);
+          try {
+            const removed = revalidateProposals(STARTUP_NATIVE_TOOLS, notify);
+            if (removed.length > 0) {
+              tests.push(`🧹 Revalidation: removed ${removed.length} stale proposal(s): ${removed.join(", ")}`);
+            }
+          } catch { /* non-critical */ }
 
           // Phase 2: Build capability tree on startup
           try { buildCapabilityTree(); } catch { /* non-critical */ }
@@ -756,7 +775,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.7.4 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
+      log.info("[aceforge] v0.7.5 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
     }
   };
 }
