@@ -172,7 +172,7 @@ export function handleCorrectionForSkill(
     notify(
       `Skill Auto-Adjustment Alert\n` +
       `${matchedSkill} has received 3+ micro-revisions in 30 days.\n` +
-      `Consider a full rewrite: /forge_quality ${matchedSkill}`
+      `Consider a full rewrite: /forge quality ${matchedSkill}`
     ).catch(console.error);
   }
 }

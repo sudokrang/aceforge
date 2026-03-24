@@ -1,6 +1,6 @@
 /**
  * AceForge — Self-Evolving Skill Engine for OpenClaw
- * v0.7.3: Single /forge router — replaced 20 commands with subcommand dispatch — C1/H1/H2/H3/H4/H5/M7 applied
+ * v0.7.4: Single /forge router — replaced 20 commands with subcommand dispatch — C1/H1/H2/H3/H4/H5/M7 applied
  *
  * Phase 1: Core engine (v0.1–v0.6.1) — pattern detection, skill crystallization, lifecycle
  * Phase 2: Proactive intelligence — capability tree, cross-session propagation, composition,
@@ -584,6 +584,23 @@ function buildPlugin() {
               const upgradeName = oldName + "-upgrade";
               const upgradeDir = path.join(PROPOSALS_DIR, upgradeName);
               if (!fs.existsSync(upgradeDir)) return { text: `No upgrade proposal for '${oldName}'.` };
+
+              // H5 fix: validate upgrade SKILL.md BEFORE retiring the old skill
+              try {
+                const { validateSkillMd: validateUpgrade } = await import("./src/skill/validator.js");
+                const upgradeMdPath = path.join(upgradeDir, "SKILL.md");
+                if (fs.existsSync(upgradeMdPath)) {
+                  const upgradeMd = fs.readFileSync(upgradeMdPath, "utf-8");
+                  const valResult = validateUpgrade(upgradeMd, upgradeName);
+                  if (valResult.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
+                    const blockReasons = valResult.errors.filter((e: string) => e.startsWith("BLOCKED:")).join("; ");
+                    fs.rmSync(upgradeDir, { recursive: true, force: true });
+                    notify(`Upgrade blocked: ${upgradeName} — ${blockReasons}`);
+                    return { text: `Upgrade '${upgradeName}' blocked by validator: ${blockReasons}` };
+                  }
+                }
+              } catch { /* validator import failed — proceed with caution */ }
+
               if (fs.existsSync(path.join(SKILLS_DIR, oldName))) { retireSkill(oldName); }
               const targetDir = path.join(SKILLS_DIR, oldName);
               fs.mkdirSync(targetDir, { recursive: true });
@@ -600,6 +617,20 @@ function buildPlugin() {
               if (!subArgs) return { text: "Usage: /forge rollback <skill-name>" };
               const retiredDir = path.join(FORGE_DIR, "retired", subArgs);
               if (!fs.existsSync(retiredDir)) return { text: `No retired version of '${subArgs}'.` };
+
+              // M10 fix: validate retired SKILL.md before deleting active version
+              const retiredMdPath = path.join(retiredDir, "SKILL.md");
+              if (fs.existsSync(retiredMdPath)) {
+                try {
+                  const { validateSkillMd: validateRollback } = await import("./src/skill/validator.js");
+                  const retiredMd = fs.readFileSync(retiredMdPath, "utf-8");
+                  const valResult = validateRollback(retiredMd, subArgs);
+                  if (valResult.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
+                    return { text: `Rollback aborted: retired version of '${subArgs}' fails security validation. Both versions preserved.` };
+                  }
+                } catch { /* validator import failed — proceed */ }
+              }
+
               if (fs.existsSync(path.join(SKILLS_DIR, subArgs))) fs.rmSync(path.join(SKILLS_DIR, subArgs), { recursive: true, force: true });
               const done = reinstateSkill(subArgs);
               if (!done) return { text: `Rollback failed for '${subArgs}'.` };
@@ -725,7 +756,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.7.3 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
+      log.info("[aceforge] v0.7.4 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)");
     }
   };
 }
@@ -769,7 +800,7 @@ function buildUnifiedGapReport(): string {
     text += `\n`;
   }
 
-  text += `Generate remediation: /forge_gap_propose`;
+  text += `Generate remediation: /forge gap_propose`;
   return text;
 }
 

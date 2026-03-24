@@ -23,6 +23,9 @@ const ACEFORGE_TOOL_BLOCKLIST = new Set([
   "forge_approve_skill", "forge_reject_skill", "forge_quality",
   "forge_approve", "forge_reject", "forge_retire", "forge_reinstate",
   "forge_registry", "forge_rewards", "forge_gaps",
+  "forge_retire_skill", "forge_tree", "forge_cross_session", "forge_compose",
+  "forge_behavior_gaps", "forge_optimize",
+  "forge_test", "forge_challenge", "forge_adversarial",
   "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
   "process", "message", "notify",
 ]);
@@ -533,12 +536,38 @@ async function analyzeChains(patterns: PatternEntry[]): Promise<void> {
 
     console.log(`[aceforge] workflow candidate: ${seqKey} (${entries.length}x, ${sessions.size} sessions)`);
 
+    // H6 fix: populate sampleTraces by correlating individual tool traces
+    // to chain events within the same session and time window
+    const sampleTraces: Array<{ tool: string; args_summary?: string; result_summary?: string; success: boolean; error?: string }[]> = [];
+    for (const chainEntry of entries.slice(0, 3)) {
+      const chainTime = new Date(chainEntry.ts).getTime();
+      const chainSession = chainEntry.session;
+      const stepsForThisExecution: { tool: string; args_summary?: string; result_summary?: string; success: boolean; error?: string }[] = [];
+      for (const toolName of tools) {
+        // Find the individual tool trace closest to the chain event in the same session
+        const match = patterns
+          .filter(p => p.tool === toolName && p.session === chainSession && p.type !== "chain" && p.type !== "correction")
+          .filter(p => Math.abs(new Date(p.ts).getTime() - chainTime) < 120000)
+          .sort((a, b) => Math.abs(new Date(a.ts).getTime() - chainTime) - Math.abs(new Date(b.ts).getTime() - chainTime))[0];
+        if (match) {
+          stepsForThisExecution.push({
+            tool: match.tool,
+            args_summary: (match.args_summary || "").slice(0, 100),
+            result_summary: ((match.result_summary as string) || "").slice(0, 100),
+            success: match.success,
+            error: ((match.error as string) || "").slice(0, 80) || undefined,
+          });
+        }
+      }
+      if (stepsForThisExecution.length > 0) sampleTraces.push(stepsForThisExecution);
+    }
+
     const chainCandidate = {
       toolSequence: tools,
       occurrences: entries.length,
       successRate: 1.0,
       distinctSessions: sessions.size,
-      sampleTraces: [] as Array<{ tool: string; args_summary?: string; result_summary?: string; success: boolean; error?: string }[]>,
+      sampleTraces,
     };
 
     try {

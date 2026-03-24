@@ -184,7 +184,6 @@ export function formatCompositionReport(): string {
     text += `\nComposition Candidates:\n`;
     for (const c of candidates.slice(0, 5)) {
       text += `  ${c.name}: ${c.suggestedFlow}\n`;
-      text += `    Propose: /forge_compose ${c.skills.join(" ")}\n`;
     }
   }
 

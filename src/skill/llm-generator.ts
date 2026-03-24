@@ -125,6 +125,15 @@ function loadLlmConfig(): LlmConfig {
 
 // ─── Helpers ────────────────────────────────────────────────────
 
+// M9 fix: sanitize trace data before injecting into LLM prompts
+function sanitizeTraceField(value: string | null | undefined, maxLen: number = 100): string {
+  if (!value) return "(none)";
+  return value
+    .replace(/[\x00-\x1f]/g, "")  // strip control characters
+    .replace(/```/g, "\`\`\`")    // escape fence boundaries
+    .slice(0, maxLen);
+}
+
 function inferCategory(toolName: string): string {
   const tool = toolName.toLowerCase();
   if (["exec", "exec-ssh", "scp", "rsync"].includes(tool)) return "operations";
@@ -148,10 +157,20 @@ function collectTracesForCandidate(candidate: Candidate): { traces: TraceEntry[]
     try {
       const e = JSON.parse(line) as TraceEntry;
       if (e.tool === candidate.tool && e.type !== "correction") traces.push(e);
-      if (e.type === "correction" && e.tool === candidate.tool) corrections.push(e);
+      // C1 fix: corrections don't have a tool field — match by temporal proximity
+      // to this candidate's tool calls within the same session
+      if (e.type === "correction" && e.text_fragment) corrections.push(e);
     } catch {}
   }
-  return { traces, corrections };
+
+  // C1 fix: filter corrections to those within 2 min of a tool trace for this candidate
+  const toolTimestamps = traces.map(t => new Date(t.ts).getTime());
+  const nearCorrections = corrections.filter(c => {
+    const corrTime = new Date(c.ts).getTime();
+    return toolTimestamps.some(t => Math.abs(corrTime - t) < 120000);
+  });
+
+  return { traces, corrections: nearCorrections };
 }
 
 function buildSkillBrief(candidate: Candidate, traces: TraceEntry[], corrections: TraceEntry[]): string {
@@ -159,10 +178,10 @@ function buildSkillBrief(candidate: Candidate, traces: TraceEntry[], corrections
   const failureTraces = traces.filter(t => !t.success);
 
   const successSamples = successTraces.slice(0, 5).map(t =>
-    `  - Args: ${t.args_summary || "(none)"}\n    Result: ${t.result_summary || "(none)"}`
+    `  - Args: ${sanitizeTraceField(t.args_summary)}\n    Result: ${sanitizeTraceField(t.result_summary, 150)}`
   ).join("\n");
   const failureSamples = failureTraces.slice(0, 3).map(t =>
-    `  - Args: ${t.args_summary || "(none)"}\n    Error: ${t.error || "unknown"}`
+    `  - Args: ${sanitizeTraceField(t.args_summary)}\n    Error: ${sanitizeTraceField(t.error, 80)}`
   ).join("\n");
   const correctionSamples = corrections.slice(0, 5).map(c =>
     `  - "${c.text_fragment || c.args_summary || ""}"`
@@ -374,9 +393,9 @@ export async function reviseSkillWithLLm(
 
   const { corrections } = collectTracesForCandidate(candidate);
   const successSamples = newTraces.filter(t => t.success).slice(0, 5).map(t =>
-    `  - Args: ${t.args_summary || "(none)"}\n    Result: ${t.result_summary || "(none)"}`).join("\n");
+    `  - Args: ${sanitizeTraceField(t.args_summary)}\n    Result: ${sanitizeTraceField(t.result_summary, 150)}`).join("\n");
   const failureSamples = newTraces.filter(t => !t.success).slice(0, 5).map(t =>
-    `  - Args: ${t.args_summary || "(none)"}\n    Error: ${t.error || "unknown"}`).join("\n");
+    `  - Args: ${sanitizeTraceField(t.args_summary)}\n    Error: ${sanitizeTraceField(t.error, 80)}`).join("\n");
   const correctionSamples = corrections.slice(0, 5).map(c =>
     `  - "${c.text_fragment || c.args_summary || ""}"`).join("\n");
 
@@ -440,6 +459,20 @@ export async function generateWorkflowSkillWithLLm(chain: ChainCandidate): Promi
   if (!config.generatorKey) return null;
 
   const stepsDesc = chain.toolSequence.map((t, i) => `Step ${i + 1}: ${t}`).join("\n");
+
+  // H6 fix: include sample execution traces for operational context
+  let sampleSection = "";
+  if (chain.sampleTraces && chain.sampleTraces.length > 0) {
+    sampleSection = "\n## Pipeline Execution Samples\n";
+    for (let i = 0; i < Math.min(chain.sampleTraces.length, 3); i++) {
+      sampleSection += `### Execution ${i + 1}\n`;
+      for (const step of chain.sampleTraces[i]) {
+        const status = step.success ? "OK" : "FAIL";
+        sampleSection += `  ${step.tool} [${status}]: Args: ${step.args_summary || "(none)"} → ${step.success ? (step.result_summary || "ok") : (step.error || "failed")}\n`;
+      }
+    }
+  }
+
   const brief = `You are writing a WORKFLOW SKILL for an OpenClaw AI agent. This skill teaches a multi-step pipeline.
 
 ## Workflow Pattern
@@ -448,14 +481,14 @@ Occurrences: ${chain.occurrences} across ${chain.distinctSessions} sessions
 
 ## Pipeline Steps
 ${stepsDesc}
-
+${sampleSection}
 ## Requirements
 - Write a WORKFLOW skill covering the COMPLETE pipeline
 - Specify how output from each step feeds into the next
 - Include error handling per step
 - Category must be: workflow
 - Keep under 150 lines
-
+${sampleSection ? "- Use the execution samples above to write SPECIFIC instructions, not generic ones" : ""}
 Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
 
   let generatedMd: string;
@@ -561,9 +594,9 @@ export async function generateUpgradeSkillWithLLm(
 
   const { traces, corrections } = collectTracesForCandidate(candidate);
   const successSamples = traces.filter(t => t.success).slice(0, 5).map(t =>
-    `  - Args: ${t.args_summary || "(none)"}\n    Result: ${t.result_summary || "(none)"}`).join("\n");
+    `  - Args: ${sanitizeTraceField(t.args_summary)}\n    Result: ${sanitizeTraceField(t.result_summary, 150)}`).join("\n");
   const failureSamples = traces.filter(t => !t.success).slice(0, 5).map(t =>
-    `  - Args: ${t.args_summary || "(none)"}\n    Error: ${t.error || "unknown"}`).join("\n");
+    `  - Args: ${sanitizeTraceField(t.args_summary)}\n    Error: ${sanitizeTraceField(t.error, 80)}`).join("\n");
   const correctionSamples = corrections.slice(0, 5).map(c =>
     `  - "${c.text_fragment || c.args_summary || ""}"`).join("\n");
 

@@ -1,5 +1,5 @@
 /**
- * AceForge v0.7.2 Test Suite
+ * AceForge v0.7.4 Test Suite
  *
  * Full coverage: Phase 1 (validator, quality, similarity, lifecycle),
  * Phase 2 (capability tree, cross-session, composition, gaps, optimizer, auto-adjust),
@@ -17,31 +17,36 @@ import { scoreStructural, scoreCoverage, scoreSkill } from "../src/skill/quality
 import { buildHierarchicalSkillIndex } from "../src/skill/index.js";
 import { runAdversarialTests } from "../src/validation/adversarial.js";
 
-const ACEFORGE_CAPTURE_BLOCKLIST = new Set([
-  "forge", "forge_status", "forge_reflect", "forge_propose",
-  "forge_approve_skill", "forge_reject_skill", "forge_approve", "forge_reject",
-  "forge_quality", "forge_registry", "forge_rewards", "forge_gaps",
-  "forge_retire", "forge_retire_skill", "forge_reinstate",
-  "forge_tree", "forge_cross_session", "forge_compose",
-  "forge_behavior_gaps", "forge_optimize",
-  "forge_test", "forge_challenge", "forge_adversarial",
-  "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
-]);
+// H2 fix: extract blocklists from ACTUAL source files to detect drift
+function extractSetFromSource(filePath: string, varName: string): Set<string> {
+  const src = fs.readFileSync(filePath, "utf-8");
+  const re = new RegExp("const " + varName + "\\s*=\\s*new Set\\(\\[([\\s\\S]*?)\\]\\)", "m");
+  const match = src.match(re);
+  if (!match) throw new Error("Could not find " + varName + " in " + filePath);
+  const items = match[1].match(/"([^"]+)"/g) || [];
+  const set = new Set(items.map((s: string) => s.replace(/"/g, "")));
+  const spreadMatches = match[1].match(/\.\.\.([A-Z_a-z]+)/g) || [];
+  for (const spread of spreadMatches) {
+    const refName = spread.replace("...", "");
+    try {
+      const refSet = extractSetFromSource(filePath, refName);
+      for (const item of refSet) set.add(item);
+    } catch { /* spread target not in same file */ }
+  }
+  return set;
+}
 
-const ACEFORGE_TOOL_BLOCKLIST = new Set([
-  ...ACEFORGE_CAPTURE_BLOCKLIST,
-  "process", "message", "notify",
-]);
+const testDir = path.dirname(new URL(import.meta.url).pathname);
+const captureFile = path.resolve(testDir, "..", "src", "pattern", "capture.ts");
+const analyzeFile = path.resolve(testDir, "..", "src", "pattern", "analyze.ts");
+const crossSessionFile = path.resolve(testDir, "..", "src", "intelligence", "cross-session.ts");
+const gapDetectFile = path.resolve(testDir, "..", "src", "pattern", "gap-detect.ts");
 
-const SELF_TOOLS = new Set([
-  "exec", "write", "edit", "delete", "move", "copy",
-  "read", "pdf", "image", "browser", "web_fetch", "web_search",
-  "session_send", "sessions_send", "broadcast",
-  "message", "notify", "process", "exec-ssh",
-  "memory_search", "memory_recall", "memory_store",
-  "file_head", "file_write", "file_read",
-  ...ACEFORGE_TOOL_BLOCKLIST,
-]);
+const ACEFORGE_CAPTURE_BLOCKLIST = extractSetFromSource(captureFile, "CAPTURE_BLOCKLIST");
+const ACEFORGE_TOOL_BLOCKLIST = extractSetFromSource(analyzeFile, "ACEFORGE_TOOL_BLOCKLIST");
+const SELF_TOOLS = extractSetFromSource(analyzeFile, "SELF_TOOLS");
+const CROSS_SESSION_BLOCKLIST = extractSetFromSource(crossSessionFile, "TOOL_BLOCKLIST");
+const GAP_DETECT_BLOCKLIST = extractSetFromSource(gapDetectFile, "GAP_BLOCKLIST");
 
 let passed = 0;
 let failed = 0;
@@ -578,6 +583,18 @@ section("Shared Blocklist: N-M5 — Consistency");
     assert(ACEFORGE_CAPTURE_BLOCKLIST.has(ft), `Forge tool '${ft}' in capture blocklist`);
     assert(ACEFORGE_TOOL_BLOCKLIST.has(ft), `Forge tool '${ft}' in tool blocklist`);
   }
+
+  // H2 fix: cross-file drift detection — verify all blocklists match canonical
+  for (const tool of ACEFORGE_TOOL_BLOCKLIST) {
+    assert(CROSS_SESSION_BLOCKLIST.has(tool), `C2 drift check: '${tool}' in cross-session blocklist`);
+    assert(GAP_DETECT_BLOCKLIST.has(tool), `C3 drift check: '${tool}' in gap-detect blocklist`);
+  }
+  for (const tool of CROSS_SESSION_BLOCKLIST) {
+    assert(ACEFORGE_TOOL_BLOCKLIST.has(tool), `C2 reverse: cross-session '${tool}' in canonical blocklist`);
+  }
+  for (const tool of GAP_DETECT_BLOCKLIST) {
+    assert(ACEFORGE_TOOL_BLOCKLIST.has(tool), `C3 reverse: gap-detect '${tool}' in canonical blocklist`);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -828,7 +845,7 @@ section("Notify: Module Import");
 // ═══════════════════════════════════════════════════════════════════
 
 console.log(`\n${"═".repeat(60)}`);
-console.log(`AceForge v0.7.2 Test Results: ${passed} passed, ${failed} failed`);
+console.log(`AceForge v0.7.4 Test Results: ${passed} passed, ${failed} failed`);
 if (failures.length > 0) {
   console.log(`\nFailures:`);
   for (const f of failures) console.log(`  ❌ ${f}`);

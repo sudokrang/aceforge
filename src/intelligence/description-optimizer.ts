@@ -164,7 +164,7 @@ export function formatOptimizationReport(): string {
     if (m.suggestedDescription) {
       text += `  Suggested: "${m.suggestedDescription}"\n`;
     }
-    text += `  → Run /forge_optimize ${m.skill} to rewrite description from conversation data\n\n`;
+    text += `\n`;
   }
 
   return text;
