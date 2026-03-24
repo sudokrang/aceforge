@@ -591,7 +591,14 @@ function buildPlugin() {
               return { text: (await validateAndDeploy(subArgs)).message };
             }
             case "reject": {
-              if (!subArgs) return { text: "Usage: /forge reject <skill-name>" };
+              if (!subArgs) return { text: "Usage: /forge reject <skill-name>  or  /forge reject all" };
+              if (subArgs === "all") {
+                const allProposals = listProposals();
+                if (allProposals.length === 0) return { text: "No proposals to reject." };
+                for (const p of allProposals) deleteProposal(p);
+                notify(`Bulk rejected ${allProposals.length} proposals: ${allProposals.join(", ")}`);
+                return { text: `Rejected all ${allProposals.length} proposals: ${allProposals.join(", ")}` };
+              }
               const deleted = deleteProposal(subArgs);
               if (!deleted) return { text: `Proposal '${subArgs}' not found.` };
               notify(`Skill rejected: ${subArgs}`);
