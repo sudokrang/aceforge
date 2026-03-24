@@ -222,6 +222,27 @@ function clusterNativeToolPatterns(
   return qualifying;
 }
 
+
+// ═══ v0.7.6: Filtered candidate logging ═══
+// Every time a candidate is suppressed by a quality gate, log WHY
+// so operators can review with /forge filtered
+
+function logFilteredCandidate(
+  tool: string,
+  reason: string,
+  detail: string,
+  meta?: Record<string, unknown>
+): void {
+  appendJsonl("filtered-candidates.jsonl", {
+    ts: new Date().toISOString(),
+    tool,
+    reason,
+    detail,
+    ...meta,
+  });
+  console.log(`[aceforge] filtered: ${tool} — ${reason}: ${detail}`);
+}
+
 function groupPatterns(patterns: PatternEntry[]): Map<string, PatternEntry[]> {
   const groups = new Map<string, PatternEntry[]>();
   const cutoff = Date.now() - THIRTY_DAYS_MS;
@@ -380,7 +401,7 @@ export async function analyzePatterns(): Promise<void> {
       // v0.7.6: Don't skip entirely — check for domain-specific sub-patterns
       const subPatterns = clusterNativeToolPatterns(key, entries, effectiveThreshold);
       if (subPatterns.length === 0) {
-        console.log(`[aceforge] skipping native tool ${key} — no qualifying sub-patterns`);
+        logFilteredCandidate(key, "native_no_subpattern", `${entries.length} entries but no qualifying domain clusters`, { occurrences: entries.length });
         continue;
       }
       // Process each qualifying sub-pattern as its own candidate
@@ -593,7 +614,10 @@ export async function analyzePatterns(): Promise<void> {
 
     // ═══ Path 3: New skill proposal — no deployed skill exists ═══
 
-    if (successRate < SUCCESS_RATE_MIN) continue;
+    if (successRate < SUCCESS_RATE_MIN) {
+      logFilteredCandidate(key, "low_success_rate", `${Math.round(successRate * 100)}% < ${Math.round(SUCCESS_RATE_MIN * 100)}% minimum`, { occurrences: entries.length, successRate: Math.round(successRate * 100) / 100 });
+      continue;
+    }
 
     // Require temporal spread — reject concentrated bursts, accept organic usage
     // Signal: 2+ sessions OR 2+ distinct days OR 2+ distinct hours with gaps
@@ -601,19 +625,19 @@ export async function analyzePatterns(): Promise<void> {
     const distinctDays = new Set(entries.map(e => new Date(e.ts).toISOString().slice(0, 10))).size;
     const distinctHours = new Set(entries.map(e => new Date(e.ts).toISOString().slice(0, 13))).size;
     if (sessions.size < 2 && distinctDays < 2 && distinctHours < 2) {
-      console.log(`[aceforge] skipping ${key} — concentrated burst (${sessions.size} sess, ${distinctDays} days, ${distinctHours} hrs)`);
+      logFilteredCandidate(key, "temporal_burst", `${sessions.size} session(s), ${distinctDays} day(s), ${distinctHours} hour(s)`, { occurrences: entries.length, sessions: sessions.size, distinctDays, distinctHours });
       continue;
     }
 
     if (hasExistingProposal(key)) {
-      console.log(`[aceforge] skipping ${key} — proposal already exists`);
+      logFilteredCandidate(key, "proposal_exists", "proposal already pending");
       continue;
     }
 
     // F1 fix: check if another proposal already covers this tool
     const existingProposal = hasProposalForSameTool(key);
     if (existingProposal) {
-      console.log(`[aceforge] skipping ${key} — already covered by proposal '${existingProposal}'`);
+      logFilteredCandidate(key, "dedup_proposal", `covered by existing proposal '${existingProposal}'`);
       continue;
     }
 
@@ -811,7 +835,7 @@ async function analyzeChains(patterns: PatternEntry[]): Promise<void> {
       }
     }
     if (toolSuccessRates.length === tools.length && toolSuccessRates.every(r => r > 0.8)) {
-      console.log(`[aceforge] skipping workflow ${seqKey} — all tools individually >80% success, chain adds no value`);
+      logFilteredCandidate(seqKey, "compositionality", `all ${tools.length} tools individually >80% success — chain adds no value`, { toolSuccessRates: toolSuccessRates.map(r => Math.round(r * 100)) });
       continue;
     }
 

@@ -744,7 +744,42 @@ function buildPlugin() {
             case "adversarial":
               return { text: formatAdversarialReport() };
 
-            // ── Help ──
+            // ── Filtered candidates ──
+            case "filtered": {
+              const filteredFile = path.join(FORGE_DIR, "filtered-candidates.jsonl");
+              if (!fs.existsSync(filteredFile)) return { text: "No filtered candidates yet." };
+              const content = fs.readFileSync(filteredFile, "utf-8").trim();
+              if (!content) return { text: "No filtered candidates yet." };
+              const entries = content.split("\n")
+                .filter(l => l.trim())
+                .map(l => { try { return JSON.parse(l); } catch { return null; } })
+                .filter(Boolean)
+                .slice(-30); // last 30
+
+              if (entries.length === 0) return { text: "No filtered candidates yet." };
+
+              // Group by reason
+              const byReason = new Map<string, typeof entries>();
+              for (const e of entries) {
+                const r = e.reason || "unknown";
+                if (!byReason.has(r)) byReason.set(r, []);
+                byReason.get(r)!.push(e);
+              }
+
+              let text = `Filtered Candidates (last ${entries.length})\n\n`;
+              for (const [reason, items] of byReason) {
+                const label = reason.replace(/_/g, " ");
+                text += `${label} (${items.length}):\n`;
+                for (const item of items.slice(-5)) {
+                  text += `  ${item.tool}: ${item.detail}\n`;
+                }
+                text += `\n`;
+              }
+              text += `Full log: ~/.openclaw/workspace/.forge/filtered-candidates.jsonl`;
+              return { text };
+            }
+
+                        // ── Help ──
             case "help":
               return { text: [
                 "AceForge Commands\n",
@@ -762,6 +797,7 @@ function buildPlugin() {
                 "  /forge quality <n>    — Score a skill against usage data",
                 "  /forge gaps           — All capability gaps",
                 "  /forge watchdog       — Effectiveness check",
+                "  /forge filtered      — What quality gates suppressed",
                 "",
                 "Intelligence:",
                 "  /forge tree           — Capability tree with gap scores",

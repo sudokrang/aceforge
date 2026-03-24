@@ -68,7 +68,7 @@ export function ensureForgeDir(): void {
       fsSync.mkdirSync(dir, { recursive: true });
     }
   }
-  const files = ["patterns.jsonl", "skill-health.jsonl", "notifications.jsonl", "candidates.jsonl"];
+  const files = ["patterns.jsonl", "skill-health.jsonl", "notifications.jsonl", "candidates.jsonl", "filtered-candidates.jsonl"];
   for (const f of files) {
     const filePath = path.join(FORGE_DIR, f);
     if (!fsSync.existsSync(filePath)) {
