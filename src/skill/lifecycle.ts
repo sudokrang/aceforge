@@ -10,15 +10,19 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
+
+// ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
+const HOME = os.homedir() || process.env.HOME || "";
 
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"
 );
 const SKILLS_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   "skills"
@@ -308,7 +312,7 @@ export function expireOldProposals(notifyFn?: (msg: string) => Promise<void>): v
     const propDir = path.join(proposalsDir, name);
     try {
       if (!fsSync.statSync(propDir).isDirectory()) continue;
-      if (now - fsSync.statSync(propDir).mtimeMs < EXPIRY_MS) continue;
+      if (now - fsSync.statSync(propDir).mtimeMs > EXPIRY_MS) continue;
     } catch { continue; }
 
     fsSync.rmSync(propDir, { recursive: true, force: true });
@@ -321,7 +325,15 @@ export function expireOldProposals(notifyFn?: (msg: string) => Promise<void>): v
 
 // ─── Deployment baselines (H4 fix: compute + store baselineSuccessRate) ──
 
+// ─── Deployment baselines (H4 fix: compute + store baselineSuccessRate) ──
+
 export function recordDeploymentBaseline(skillName: string, toolName: string): void {
+  // Idempotency: skip if a baseline already exists for this skill
+  const existing = getHealthEntries(skillName);
+  if (existing.some(e => e.action === "deployment_baseline")) {
+    return; // Already recorded — do not append duplicate
+  }
+
   const pFile = path.join(FORGE_DIR, "patterns.jsonl");
   let baselineRate = 0;
   let traceCount = 0;

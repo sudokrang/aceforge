@@ -10,10 +10,13 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 import { appendJsonl } from "../pattern/store.js";
 
+const HOME = os.homedir() || process.env.HOME || "";
+
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"
@@ -81,8 +84,17 @@ const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
   openrouter: { url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },
 };
 
+// ─── Config cache (avoids reading openclaw.json on every call) ──
+let _configCache: { config: LlmConfig; ts: number } | null = null;
+const CONFIG_CACHE_TTL_MS = 60_000; // 60 seconds
+
 function loadLlmConfig(): LlmConfig {
-  const cfgPath = path.join(process.env.HOME || "", ".openclaw", "openclaw.json");
+  // Return cached config if still fresh
+  if (_configCache && Date.now() - _configCache.ts < CONFIG_CACHE_TTL_MS) {
+    return _configCache.config;
+  }
+
+  const cfgPath = path.join(HOME, ".openclaw", "openclaw.json");
   let cfg: Record<string, unknown> = {};
   try { cfg = JSON.parse(fsSync.readFileSync(cfgPath, "utf-8")); } catch {}
 
@@ -96,7 +108,7 @@ function loadLlmConfig(): LlmConfig {
   const revCfg = providers?.[revProvider] || {};
   const revDef = PROVIDER_DEFAULTS[revProvider] || { url: "", model: "" };
 
-  return {
+  const result: LlmConfig = {
     generatorKey: genCfg.apiKey || process.env.ACEFORGE_GENERATOR_API_KEY || "",
     generatorUrl: (genCfg.baseURL || process.env.ACEFORGE_GENERATOR_URL || genDef.url).replace(/\/$/, ""),
     generatorModel: process.env.ACEFORGE_GENERATOR_MODEL || genDef.model,
@@ -106,6 +118,9 @@ function loadLlmConfig(): LlmConfig {
     reviewerModel: process.env.ACEFORGE_REVIEWER_MODEL || revDef.model,
     reviewerProvider: revProvider,
   };
+
+  _configCache = { config: result, ts: Date.now() };
+  return result;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────

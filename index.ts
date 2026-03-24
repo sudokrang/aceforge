@@ -6,6 +6,7 @@
  */
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { ensureForgeDir } from "./src/pattern/store.js";
 import { captureToolTrace } from "./src/pattern/capture.js";
 import { detectCorrectionPatterns } from "./src/pattern/detect.js";
@@ -13,6 +14,7 @@ import { analyzePatterns } from "./src/pattern/analyze.js";
 import { buildHierarchicalSkillIndex } from "./src/skill/index.js";
 import { notify } from "./src/notify.js";
 import { resetLlmRateLimit } from "./src/skill/llm-generator.js";
+import { resetJudgeRateLimit } from "./src/skill/llm-judge.js";
 import {
   recordActivation,
   recordDeploymentBaseline,
@@ -33,8 +35,9 @@ import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";
 import { detectGaps } from "./src/pattern/gap-detect.js";
 
 // ─── Paths ────────────────────────────────────────────────────────────────
-const FORGE_DIR = path.join(process.env.HOME || "~", ".openclaw", "workspace", ".forge");
-const SKILLS_DIR = path.join(process.env.HOME || "~", ".openclaw", "workspace", "skills");
+const HOME = os.homedir() || process.env.HOME || "";
+const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
+const SKILLS_DIR = path.join(HOME, ".openclaw", "workspace", "skills");
 const PROPOSALS_DIR = path.join(FORGE_DIR, "proposals");
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -178,7 +181,7 @@ function buildPlugin() {
           // Test 3: Telegram bot
           try {
             const config = JSON.parse(fs.readFileSync(
-              path.join(process.env.HOME || "~", ".openclaw", "openclaw.json"), "utf-8"
+              path.join(HOME, ".openclaw", "openclaw.json"), "utf-8"
             ));
             const botToken = config.channels?.telegram?.botToken;
             if (botToken) {
@@ -234,6 +237,7 @@ function buildPlugin() {
       // ── HOOK: agent_end ───────────────────────────────────────────
       api.on("agent_end", (_event: any, _ctx: any) => {
         resetLlmRateLimit();
+        resetJudgeRateLimit();
         analyzePatterns().catch((err: Error) =>
           log.error(`[aceforge] pattern analysis error: ${err.message}`)
         );
@@ -260,6 +264,24 @@ function buildPlugin() {
           resetLlmRateLimit();
           await analyzePatterns();
           return { content: [{ type: "text", text: "Reflection complete. Check /forge_status for any new candidates." }] };
+        },
+      });
+
+      api.registerTool({
+        name: "forge_gaps",
+        description: "Detect and report capability gaps from failure patterns, retry storms, and correction clusters.",
+        parameters: { type: "object", properties: {} },
+        async execute(_toolCallId: string, _params: Record<string, unknown>) {
+          const gaps = detectGaps();
+          if (gaps.length === 0) {
+            return { content: [{ type: "text", text: "No capability gaps detected. The agent is performing well across all tools." }] };
+          }
+          const lines: string[] = [`${gaps.length} gap(s) detected:\n`];
+          for (const gap of gaps) {
+            const severityLabel = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
+            lines.push(`${gap.tool} (${severityLabel}): ${gap.gapType.replace(/_/g, " ")} — ${gap.evidence[0] || "no evidence"}`);
+          }
+          return { content: [{ type: "text", text: lines.join("\n") }] };
         },
       });
 

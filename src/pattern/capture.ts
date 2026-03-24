@@ -8,6 +8,7 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 import { appendJsonl } from "./store.js";
 import {
   recordActivation,
@@ -19,15 +20,17 @@ import {
 } from "../skill/lifecycle.js";
 import { notify } from "../notify.js";
 
+const HOME = os.homedir() || process.env.HOME || "";
+
 const SKILLS_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   "skills"
 );
 
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"

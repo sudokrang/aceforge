@@ -5,8 +5,10 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 
-const FORGE_DIR = path.join(process.env.HOME || "~", ".openclaw", "workspace", ".forge");
+const HOME = os.homedir() || process.env.HOME || "";
+const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
 
 interface PatternEntry {
   ts: string; tool: string; args_summary: string | null;

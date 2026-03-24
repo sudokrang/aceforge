@@ -1,8 +1,11 @@
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
+
+const HOME = os.homedir() || process.env.HOME || "";
 
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"
@@ -15,7 +18,7 @@ interface NotifyConfig {
 }
 
 function loadNotifyConfig(): NotifyConfig {
-  const configPath = path.join(process.env.HOME || "~", ".openclaw", "openclaw.json");
+  const configPath = path.join(HOME, ".openclaw", "openclaw.json");
   let config: Record<string, unknown> = {};
   try {
     config = JSON.parse(fsSync.readFileSync(configPath, "utf-8"));
@@ -29,7 +32,13 @@ function loadNotifyConfig(): NotifyConfig {
 
   const tg = (config as any)?.channels?.telegram;
   const tgToken = tg?.botToken || process.env.ACEFORGE_TELEGRAM_BOT_TOKEN || "";
-  const tgChatId = tg?.allowFrom?.[0] || process.env.ACEFORGE_OWNER_CHAT_ID || "";
+  // NOTE: allowFrom contains authorized sender identifiers (e.g. phone numbers),
+  // NOT Telegram chat_ids. Telegram chat_id comes from Message.chat.id.
+  // Priority: ACEFORGE_OWNER_CHAT_ID env > config identityLinks > hardcoded fallback.
+  const tgChatId =
+    process.env.ACEFORGE_OWNER_CHAT_ID ||
+    (config as any)?.session?.identityLinks?.sean?.find((l: string) => l.startsWith("telegram:"))?.split(":")[1] ||
+    "6326139181"; // Sean's Telegram ID as last-resort fallback
   const telegramAvailable = !!(tgToken && tgChatId);
 
   const slackWebhook = process.env.ACEFORGE_SLACK_WEBHOOK_URL || "";

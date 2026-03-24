@@ -9,6 +9,7 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 import { appendJsonl } from "./store.js";
 import { notify } from "../notify.js";
 import { generateSkillFromCandidate, writeProposal } from "../skill/generator.js";
@@ -19,13 +20,15 @@ import { scoreSkill } from "../skill/quality-score.js";
 import { llmJudgeEvaluate } from "../skill/llm-judge.js";
 import { getEffectiveCrystallizationThreshold, getHealthEntries } from "../skill/lifecycle.js";
 
+const HOME = os.homedir() || process.env.HOME || "";
+
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"
 );
-const SKILLS_DIR = path.join(process.env.HOME || "~", ".openclaw", "workspace", "skills");
+const SKILLS_DIR = path.join(HOME, ".openclaw", "workspace", "skills");
 const PROPOSALS_DIR = path.join(FORGE_DIR, "proposals");
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const SUCCESS_RATE_MIN = 0.40;
@@ -125,6 +128,31 @@ function hasActiveProposalOrSkill(tool: string): boolean {
       try { return fsSync.statSync(path.join(SKILLS_DIR, s)).isDirectory() && (s === tool || s.startsWith(tool + "-")); }
       catch { return false; }
     })) return true;
+  }
+  // M3-fix: Also check if any installed workspace skill explicitly declares it wraps this tool
+  // (skill name may differ from tool name, e.g. "tavily" skill wraps "tavily_search" tool)
+  if (fsSync.existsSync(SKILLS_DIR)) {
+    const skills = fsSync.readdirSync(SKILLS_DIR);
+    for (const s of skills) {
+      try {
+        const skillPath = path.join(SKILLS_DIR, s);
+        if (!fsSync.statSync(skillPath).isDirectory()) continue;
+        const mdPath = path.join(skillPath, "SKILL.md");
+        if (!fsSync.existsSync(mdPath)) continue;
+        const content = fsSync.readFileSync(mdPath, "utf-8");
+        const match = content.match(/^metadata:\s*(\{.*\})/ms);
+        if (!match) continue;
+        try {
+          const md = JSON.parse(match[1]);
+          // Check bundledTools array in metadata (recommended approach)
+          if (md?.openclaw?.bundledTools?.includes?.(tool)) return true;
+          // Fallback: check if description mentions the tool (heuristic)
+          if (md?.openclaw?.description &&
+              typeof md.openclaw.description === "string" &&
+              md.openclaw.description.toLowerCase().includes(tool.replace(/_/g, " ").toLowerCase())) return true;
+        } catch { /* invalid JSON in metadata */ }
+      } catch { /* skip unreadable skills */ }
+    }
   }
   return false;
 }

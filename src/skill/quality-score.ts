@@ -10,10 +10,13 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 import { getHealthEntries } from "./lifecycle.js";
 
+const HOME = os.homedir() || process.env.HOME || "";
+
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"
@@ -373,7 +376,7 @@ export function scoreCoverage(skillMd: string, toolName: string): { total: numbe
   // 5. Success improvement (0-10) — H3 fix: uses static import now
   let successImprovement = 5;
   try {
-    const SKILLS_DIR_QS = path.join(process.env.HOME || "~", ".openclaw", "workspace", "skills");
+    const SKILLS_DIR_QS = path.join(HOME, ".openclaw", "workspace", "skills");
     if (fsSync.existsSync(SKILLS_DIR_QS)) {
       for (const dir of fsSync.readdirSync(SKILLS_DIR_QS)) {
         if (dir.startsWith(toolName) || dir === toolName) {

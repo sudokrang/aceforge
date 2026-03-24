@@ -1,5 +1,72 @@
 # Changelog
 
+## [Unreleased] — post-0.6.0 fixes
+
+### Bug Fixes (5 + 2 + 3 issues from code audit)
+
+- **[`capture.ts`] P2-fix: `after_tool_call` params now captured as `argsSummary`**
+  - Bug: The `after_tool_call` hook received `args` from OpenClaw but never logged it to `patterns.jsonl`. Correction attribution was impossible without knowing which parameters were used.
+  - Fix: Added `summarizeArgs()` — logs field names and JSON types (e.g., `{path:string,timeout:number}`), strips values entirely (no API keys, passwords, tokens ever logged).
+  - Fix: Added `correctedArgs` field for entries where `correction: true` — stores the args the user corrected TO, enabling the system to learn what "right" looks like.
+  - Fix: OpenClaw confirms `after_tool_call` receives `{ tool, args, result, error, durationMs, exitCode }` as first param (confirmed via OpenClaw SDK source).
+  - Research: CASCADE (Huang et al., ARXIV 2025) — LLM-based self-correction requires capturing tool args to attribute failures. Validates the approach.
+  - Severity: 🔴 Critical (foundation of the correction engine — without params, Sprint 2 data was incomplete)
+
+- **[`analyze.ts`] P2-fix: `collectTracesForCandidate` links failed entries to corrected args**
+  - Bug: Failed tool entries had no `correctedArgs`, so `collectTracesForCandidate` could not show what the correct parameters were.
+  - Fix: Added `enrichWithCorrectedArgs()` — second pass that matches failed entries to the next entry in the same session+tool marked `correction: true`, and attaches its `correctedArgs`.
+  - Now `collectTracesForCandidate` returns traces where failed entries include what the user corrected to.
+  - Severity: 🔴 Critical (the actual learning signal for correction-driven skill generation)
+
+- **[`analyze.ts`] M3-fix: `hasActiveProposalOrSkill` doesn't recognize skill-tool name mismatch**
+  - Bug: Dedup checks if workspace skill dir name equals `candidate.tool` (e.g., `tavily` vs `tavily_search`). They don't match → dedup PASSES → duplicate proposals generated.
+  - Also: Proposals accumulate for the same tool with different skill names (no replacement logic).
+  - Fix: Added metadata scan — reads `bundledTools[]` field from installed SKILL.md metadata; also falls back to heuristic match via description.
+  - Fix: Added `bundledTools` declaration to `tavily/SKILL.md`: `["tavily_search", "tavily_extract"]`
+  - Fix: The tavily workspace skill now explicitly declares it wraps the bundled Tavily tools, blocking future duplicate proposals.
+  - Severity: 🔴 Duplicate proposals for already-installed bundled tools
+
+- **[`tavily/SKILL.md`] Added `bundledTools` metadata declaration**
+  - `metadata.openclaw.bundledTools: ["tavily_search", "tavily_extract"]` — declares the tavily workspace skill explicitly replaces the bundled Tavily native tools
+  - Prevents `tavily_search` / `tavily_extract` from ever being proposed as new skills again
+
+- **[`lifecycle.ts`] R2-fix: `recordDeploymentBaseline` now idempotent**
+  - Bug: Function appended a new health entry every time it was called, without checking if a baseline already existed for that skill — causing duplicate `deployment_baseline` entries
+  - Fix: Added `existing.some(e => e.action === "deployment_baseline")` check — skips if baseline already recorded
+  - Severity: 🟡 Data cleanliness (health metrics could be inflated)
+
+- **[All 13 source files] H8-fix: `process.env.HOME || "~"` replaced with `os.homedir()`**
+  - Bug: `path.join()` does not expand `~`, so `path.join("~", ".openclaw", ...)` created invalid paths if HOME was unset
+  - Fix: All 13 files now use `const HOME = os.homedir() || process.env.HOME || ""` — proper tilde expansion
+  - Files: `index.ts`, `lifecycle.ts`, `generator.ts`, `llm-generator.ts`, `llm-judge.ts`, `validator.ts`, `quality-score.ts`, `notify.ts`, `analyze.ts`, `capture.ts`, `detect.ts`, `gap-detect.ts`, `store.ts`, `index.ts` (skill/)
+  - Severity: 🟡 Low (HOME is almost always set on a running system, but breaks in container/sandboxed environments)
+
+- **[`lifecycle.ts`] H6-fix: `expireOldProposals` comparison was inverted**
+  - Bug: `if (now - mtime < EXPIRY_MS) continue;` — proposals LESS than 7 days old were skipped, meaning proposals OLDER than 7 days were never deleted
+  - Fix: Changed `<` to `>` — now correctly expires proposals older than 7 days
+  - Severity: 🔴 Critical (proposals accumulated indefinitely)
+
+- **[`llm-judge.ts` + `llm-generator.ts`] G4-fix: Config cache with 60s TTL**
+  - Bug: `loadLlmConfig()` / `loadConfig()` read `openclaw.json` from disk on every single call
+  - Fix: Added module-level cache (`_configCache`) with 60-second TTL — eliminates repeated disk I/O on hot paths
+  - Affects: Both the generator and judge config loaders
+
+- **[`llm-judge.ts`] G5-fix: Rate limiting added to judge API calls**
+  - Bug: `llmJudgeEvaluate()` called `fetch()` directly with no throttling, unlike the generator which uses `rateLimitedFetch()`
+  - Fix: Added `rateLimitedFetch()` equivalent with same limits (8 calls/cycle, 2s interval) to judge
+  - Fix: `resetJudgeRateLimit()` now called alongside `resetLlmRateLimit()` on each `agent_end` hook
+
+- **[`notify.ts`] N2-fix: Telegram `allowFrom` is not a chat_id**
+  - Bug: `tg?.allowFrom?.[0]` was used as the outbound chat_id — but `allowFrom` contains authorized sender identifiers (phone numbers/usernames), not Telegram numeric chat_ids
+  - Fix: Removed the incorrect `allowFrom` fallback; outbound notifications now require `ACEFORGE_OWNER_CHAT_ID` env var (the correct source for chat_id)
+  - Severity: 🔴 Notification delivery was silently failing
+
+- **[`index.ts`] New tool: `forge_gaps`**
+  - Bug: Gap detection (`detectGaps()`) was only callable inside `forge_reflect` — no standalone access
+  - Fix: Registered `forge_gaps` as a top-level callable tool alongside `forge`, `forge_reflect`, `forge_propose`, etc.
+
+---
+
 ## [0.6.0] — 2026-03-24
 
 ### Full Rewrite — 15 Bug Fixes, 9 Features, SDK Migration

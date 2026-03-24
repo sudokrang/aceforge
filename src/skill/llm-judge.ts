@@ -7,7 +7,32 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 import type { QualityReport } from "./quality-score.js";
+
+// ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
+const HOME = os.homedir() || process.env.HOME || "";
+
+// ─── G5: Rate limiter (same as llm-generator.ts — prevents judge API spam) ──
+const JUDGE_MIN_INTERVAL_MS = 2000;
+const JUDGE_MAX_CALLS_PER_CYCLE = 8;
+let _judgeLastCallMs = 0;
+let _judgeCallsThisCycle = 0;
+
+export function resetJudgeRateLimit(): void { _judgeCallsThisCycle = 0; }
+
+async function rateLimitedFetch(url: string, init: RequestInit): Promise<Response> {
+  if (_judgeCallsThisCycle >= JUDGE_MAX_CALLS_PER_CYCLE) {
+    console.warn("[aceforge/judge] Rate limit reached — skipping");
+    throw new Error("Rate limit: max judge calls per cycle reached");
+  }
+  const now = Date.now();
+  const wait = Math.max(0, JUDGE_MIN_INTERVAL_MS - (now - _judgeLastCallMs));
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  _judgeLastCallMs = Date.now();
+  _judgeCallsThisCycle++;
+  return fetch(url, init);
+}
 
 interface LlmConfig {
   reviewerKey: string;
@@ -22,8 +47,16 @@ const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
   openrouter: { url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },
 };
 
+// ─── Config cache (avoids reading openclaw.json on every call) ──
+let _configCache: { config: LlmConfig; ts: number } | null = null;
+const CONFIG_CACHE_TTL_MS = 60_000; // 60 seconds
+
 function loadConfig(): LlmConfig {
-  const cfgPath = path.join(process.env.HOME || "", ".openclaw", "openclaw.json");
+  // Return cached config if still fresh
+  if (_configCache && Date.now() - _configCache.ts < CONFIG_CACHE_TTL_MS) {
+    return _configCache.config;
+  }
+  const cfgPath = path.join(HOME, ".openclaw", "openclaw.json");
   let cfg: Record<string, unknown> = {};
   try { cfg = JSON.parse(fsSync.readFileSync(cfgPath, "utf-8")); } catch {}
 
@@ -32,11 +65,14 @@ function loadConfig(): LlmConfig {
   const revCfg = providers?.[revProvider] || {};
   const revDef = PROVIDER_DEFAULTS[revProvider] || { url: "", model: "" };
 
-  return {
+  const result: LlmConfig = {
     reviewerKey: revCfg.apiKey || process.env.ACEFORGE_REVIEWER_API_KEY || "",
     reviewerUrl: (revCfg.baseURL || process.env.ACEFORGE_REVIEWER_URL || revDef.url).replace(/\/$/, ""),
     reviewerModel: process.env.ACEFORGE_REVIEWER_MODEL || revDef.model,
   };
+
+  _configCache = { config: result, ts: Date.now() };
+  return result;
 }
 
 export interface JudgeResult {
@@ -90,7 +126,7 @@ RECOMMENDATION: <upgrade|keep|borderline>
 REASONING: <2-3 sentences explaining your assessment>`;
 
   try {
-    const res = await fetch(`${config.reviewerUrl}/chat/completions`, {
+    const res = await rateLimitedFetch(`${config.reviewerUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

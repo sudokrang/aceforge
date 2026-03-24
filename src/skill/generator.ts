@@ -3,9 +3,12 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
+
+const HOME = os.homedir() || process.env.HOME || "";
 
 const FORGE_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   ".forge"

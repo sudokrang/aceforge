@@ -7,9 +7,13 @@
  */
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
+
+// ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
+const HOME = os.homedir() || process.env.HOME || "";
 
 const SKILLS_DIR = path.join(
-  process.env.HOME || "~",
+  HOME,
   ".openclaw",
   "workspace",
   "skills"
@@ -74,7 +78,7 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
   }
 
   // P1: Path traversal — check code-like lines for workspace escapes
-  const workspaceBase = path.join(process.env.HOME || "~", ".openclaw", "workspace");
+  const workspaceBase = path.join(HOME, ".openclaw", "workspace");
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith("---") || trimmed.startsWith("#") || trimmed.startsWith("//")) continue;
