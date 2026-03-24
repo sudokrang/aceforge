@@ -97,6 +97,131 @@ function readPatternsFile(): PatternEntry[] {
     .filter(Boolean) as PatternEntry[];
 }
 
+
+// ═══ v0.7.6: Argument-pattern clustering for native tools ═══
+// Extracts a domain prefix from tool arguments to enable sub-pattern clustering.
+// exec with docker args → "docker", exec with ssh args → "ssh", etc.
+
+function extractDomainPrefix(toolName: string, argsSummary: string | null): string | null {
+  if (!argsSummary) return null;
+  const args = argsSummary.toLowerCase();
+
+  // For exec/exec-ssh: extract the command being run
+  if (toolName === "exec" || toolName === "exec-ssh") {
+    // JSON args: {"command":"docker ps"} or {"command":"ssh nas ..."}
+    try {
+      const parsed = JSON.parse(argsSummary);
+      const cmd = (parsed.command || parsed.cmd || "").trim();
+      if (!cmd) return null;
+      // Extract first word of the command
+      const firstWord = cmd.split(/\s+/)[0].replace(/^.*\//, ""); // strip path prefix
+      // Map common commands to domain prefixes
+      const domainMap: Record<string, string> = {
+        docker: "docker", "docker-compose": "docker", podman: "docker",
+        ssh: "ssh", scp: "ssh", rsync: "ssh",
+        git: "git", gh: "git",
+        npm: "npm", npx: "npm", pnpm: "npm", yarn: "npm", node: "npm",
+        python: "python", python3: "python", pip: "python", pip3: "python",
+        systemctl: "systemd", service: "systemd", journalctl: "systemd",
+        kubectl: "k8s", helm: "k8s",
+        curl: "http", wget: "http", fetch: "http",
+        apt: "apt", "apt-get": "apt", brew: "brew",
+        tar: "archive", gzip: "archive", unzip: "archive",
+        grep: "search", find: "search", rg: "search",
+        ls: null, cd: null, pwd: null, echo: null, cat: null, // too generic
+      };
+      if (firstWord in domainMap) return domainMap[firstWord];
+      // If command targets a known host pattern, use that
+      if (/\b(?:nas|synology|192\.168\.)/.test(cmd)) return "nas";
+      if (/\b(?:netsuite|suiteql)/.test(cmd)) return "netsuite";
+      // Default: use the command itself if it's specific enough
+      if (firstWord.length >= 3 && firstWord.length <= 20) return firstWord;
+      return null;
+    } catch {
+      // Non-JSON args — try extracting first meaningful token
+      const tokens = args.replace(/[{}":\[\]]/g, " ").split(/\s+/).filter(t => t.length >= 3);
+      if (tokens.length > 0) {
+        const first = tokens[0];
+        if (/docker|ssh|git|npm|python|systemctl|curl/.test(first)) return first;
+      }
+      return null;
+    }
+  }
+
+  // For read/write: extract file extension or path pattern
+  if (toolName === "read" || toolName === "write" || toolName === "edit") {
+    try {
+      const parsed = JSON.parse(argsSummary);
+      const filePath = (parsed.path || parsed.file || "").toLowerCase();
+      if (!filePath) return null;
+      // Classify by extension
+      if (/\.json$/.test(filePath)) return "config";
+      if (/\.ya?ml$/.test(filePath)) return "config";
+      if (/\.ts$|\.js$|\.tsx$|\.jsx$/.test(filePath)) return "code";
+      if (/\.py$/.test(filePath)) return "python";
+      if (/\.md$/.test(filePath)) return "docs";
+      if (/\.csv$|\.xlsx?$/.test(filePath)) return "data";
+      if (/\.log$/.test(filePath)) return "logs";
+      if (/dockerfile|docker-compose/i.test(filePath)) return "docker";
+      // Classify by path pattern
+      if (/\.openclaw/.test(filePath)) return "openclaw-config";
+      if (/\/etc\//.test(filePath)) return "system-config";
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+interface SubPatternGroup {
+  tool: string;
+  domain: string;
+  skillName: string;
+  entries: PatternEntry[];
+}
+
+function clusterNativeToolPatterns(
+  tool: string,
+  entries: PatternEntry[],
+  effectiveThreshold: number
+): SubPatternGroup[] {
+  const clusters = new Map<string, PatternEntry[]>();
+
+  for (const e of entries) {
+    const domain = extractDomainPrefix(tool, e.args_summary);
+    if (!domain) continue; // unclassifiable — skip
+    if (!clusters.has(domain)) clusters.set(domain, []);
+    clusters.get(domain)!.push(e);
+  }
+
+  const qualifying: SubPatternGroup[] = [];
+  for (const [domain, clusterEntries] of clusters) {
+    if (clusterEntries.length < effectiveThreshold) continue;
+
+    // Apply same temporal spread gate
+    const sessions = new Set(clusterEntries.map(e => e.session).filter(Boolean));
+    const distinctDays = new Set(clusterEntries.map(e => new Date(e.ts).toISOString().slice(0, 10))).size;
+    const distinctHours = new Set(clusterEntries.map(e => new Date(e.ts).toISOString().slice(0, 13))).size;
+    if (sessions.size < 2 && distinctDays < 2 && distinctHours < 2) continue;
+
+    // Apply success rate gate
+    const successes = clusterEntries.filter(e => e.success).length;
+    const successRate = successes / clusterEntries.length;
+    if (successRate < 0.40) continue;
+
+    qualifying.push({
+      tool,
+      domain,
+      skillName: `${tool}-${domain}`,
+      entries: clusterEntries,
+    });
+  }
+
+  return qualifying;
+}
+
 function groupPatterns(patterns: PatternEntry[]): Map<string, PatternEntry[]> {
   const groups = new Map<string, PatternEntry[]>();
   const cutoff = Date.now() - THIRTY_DAYS_MS;
@@ -252,8 +377,82 @@ export async function analyzePatterns(): Promise<void> {
   for (const [key, entries] of groups) {
     if (entries.length < effectiveThreshold) continue;
     if (NATIVE_TOOLS.has(key)) {
-      console.log(`[aceforge] skipping native/self tool: ${key}`);
-      continue;
+      // v0.7.6: Don't skip entirely — check for domain-specific sub-patterns
+      const subPatterns = clusterNativeToolPatterns(key, entries, effectiveThreshold);
+      if (subPatterns.length === 0) {
+        console.log(`[aceforge] skipping native tool ${key} — no qualifying sub-patterns`);
+        continue;
+      }
+      // Process each qualifying sub-pattern as its own candidate
+      for (const sp of subPatterns) {
+        const spSessions = new Set(sp.entries.map(e => e.session).filter(Boolean));
+        const spSuccesses = sp.entries.filter(e => e.success).length;
+        const spSuccessRate = spSuccesses / sp.entries.length;
+
+        if (hasActiveProposalOrSkill(sp.skillName)) {
+          console.log(`[aceforge] skipping sub-pattern ${sp.skillName} — already exists`);
+          continue;
+        }
+        if (hasExistingProposal(sp.skillName)) {
+          console.log(`[aceforge] skipping sub-pattern ${sp.skillName} — proposal exists`);
+          continue;
+        }
+        const existingProposal = hasProposalForSameTool(sp.skillName);
+        if (existingProposal) {
+          console.log(`[aceforge] skipping sub-pattern ${sp.skillName} — covered by '${existingProposal}'`);
+          continue;
+        }
+
+        console.log(`[aceforge] native tool sub-pattern: ${sp.skillName} (${sp.entries.length}x, ${spSessions.size} sessions, ${sp.domain} domain)`);
+
+        const candidate = {
+          ts: new Date().toISOString(),
+          tool: key,
+          args_summary_prefix: sp.entries[0].args_summary?.slice(0, 50) || "",
+          occurrences: sp.entries.length,
+          success_rate: Math.round(spSuccessRate * 100) / 100,
+          distinct_sessions: spSessions.size,
+          first_seen: sp.entries[sp.entries.length - 1].ts,
+          last_seen: sp.entries[0].ts,
+        };
+
+        // Generate with LLM, fall back to template
+        try {
+          const llmResult = await generateSkillWithLLm(candidate);
+          if (llmResult && llmResult.verdict !== "REJECT") {
+            const nameMatch = llmResult.skillMd.match(/^name:\s*(.+)$/m);
+            const finalName = nameMatch
+              ? nameMatch[1].trim().replace(/[^a-z0-9-_]/gi, "-").toLowerCase().slice(0, 60)
+              : sp.skillName;
+            const validation = validateSkillMd(llmResult.skillMd, finalName);
+            if (validation.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
+              console.log(`[aceforge] sub-pattern ${finalName} blocked by validator`);
+              continue;
+            }
+            writeProposal(finalName, llmResult.skillMd);
+            appendJsonl("candidates.jsonl", { ...candidate, type: "native-subpattern", domain: sp.domain });
+
+            const descMatch = llmResult.skillMd.match(/^description:\s*["']?(.+?)["']?$/m);
+            const summary = descMatch ? descMatch[1].slice(0, 120) : sp.skillName;
+
+            notify(
+              `Native Tool Sub-Pattern Proposal\n` +
+              `${finalName}\n` +
+              `Tool: ${key} (${sp.domain} domain)\n` +
+              `${sp.entries.length}x, ${Math.round(spSuccessRate * 100)}% success, ${spSessions.size} sessions\n` +
+              `Summary: ${summary}\n` +
+              `Use: /forge approve ${finalName}  or  /forge reject ${finalName}`
+            ).catch(err => console.error("[aceforge] notify error:", err));
+
+            console.log(`[aceforge] sub-pattern proposal written: ${finalName}`);
+          } else {
+            console.log(`[aceforge] sub-pattern ${sp.skillName} rejected by LLM`);
+          }
+        } catch (err) {
+          console.error(`[aceforge] sub-pattern generation error for ${sp.skillName}:`, err);
+        }
+      }
+      continue; // Done with this native tool — move to next group
     }
 
     const sessions = new Set(entries.map(e => e.session).filter(Boolean));
