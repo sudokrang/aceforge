@@ -306,7 +306,7 @@ export async function analyzePatterns(): Promise<void> {
                 `Tool: ${key}\n` +
                 `${newTraceCount} new traces since deployment\n` +
                 `Summary: ${summary}\n` +
-                `Use: /forge_approve ${evoName}  or  /forge_reject ${evoName}`
+                `Use: /forge approve ${evoName}  or  /forge reject ${evoName}`
               ).catch(err => console.error("[aceforge] notify error:", err));
               evolutionProposed = true;
             }
@@ -382,7 +382,7 @@ export async function analyzePatterns(): Promise<void> {
               `Current score: ${finalScore}/100\n` +
               `Issues: ${reportText}\n` +
               (judgeReasoning ? `LLM judge: ${judgeReasoning.slice(0, 100)}\n` : "") +
-              `Use: /forge_upgrade ${deployedSkill}  or  /forge_reject ${upgradeName}`
+              `Use: /forge upgrade ${deployedSkill}  or  /forge reject ${upgradeName}`
             ).catch(err => console.error("[aceforge] notify error:", err));
           }
         } catch (err) {
@@ -519,7 +519,7 @@ export async function analyzePatterns(): Promise<void> {
       `${entries.length}x, ${Math.round(successRate * 100)}% success, ${sessions.size} sessions\n` +
       `Summary: ${summary}` +
       notesSuffix + `\n` +
-      `Use: /forge_approve ${skillName}  or  /forge_reject ${skillName}`
+      `Use: /forge approve ${skillName}  or  /forge reject ${skillName}`
     ).catch(err => console.error("[aceforge] notify error:", err));
   }
 
@@ -553,7 +553,7 @@ export async function analyzePatterns(): Promise<void> {
         `Skill Effectiveness Alert\n` +
         `${watchdogAlerts.length} skill(s) flagged for review:\n` +
         alertText + `\n` +
-        `Consider: /forge_retire <name> or wait for evolution cycle`
+        `Consider: /forge retire <name> or wait for evolution cycle`
       ).catch(err => console.error("[aceforge] notify error:", err));
     }
   } catch (err) {
@@ -671,7 +671,7 @@ async function analyzeChains(patterns: PatternEntry[]): Promise<void> {
         `Pipeline: ${tools.join(" → ")}\n` +
         `${entries.length}x across ${sessions.size} sessions` +
         notesSuffix + `\n` +
-        `Use: /forge_approve ${skillName}  or  /forge_reject ${skillName}`
+        `Use: /forge approve ${skillName}  or  /forge reject ${skillName}`
       ).catch(err => console.error("[aceforge] notify error:", err));
 
       console.log(`[aceforge] workflow proposal written: ${skillName}`);
@@ -691,6 +691,12 @@ async function analyzeGaps(preloadedPatterns?: PatternEntry[]): Promise<void> {
 
   for (const gap of gaps.slice(0, 3)) {
     if (gap.severity < 6) continue;
+
+    // H1 hotfix: skip remediation for native OpenClaw tools
+    if (NATIVE_TOOLS.has(gap.tool)) {
+      console.log(`[aceforge] skipping remediation for native tool: ${gap.tool}`);
+      continue;
+    }
 
     const skillName = gap.tool.replace(/[^a-z0-9-_]/gi, "-").toLowerCase() + "-guard";
 
@@ -731,7 +737,7 @@ async function analyzeGaps(preloadedPatterns?: PatternEntry[]): Promise<void> {
         `Gap: ${gap.gapType.replace(/_/g, " ")}\n` +
         `${gap.evidence.slice(0, 2).join("; ")}` +
         notesSuffix + `\n` +
-        `Use: /forge_approve ${skillName}  or  /forge_reject ${skillName}`
+        `Use: /forge approve ${skillName}  or  /forge reject ${skillName}`
       ).catch(err => console.error("[aceforge] notify error:", err));
 
       console.log(`[aceforge] remediation proposal written: ${skillName}`);
