@@ -396,6 +396,12 @@ export async function analyzePatterns(): Promise<void> {
 
     if (successRate < SUCCESS_RATE_MIN) continue;
 
+    // Require 2+ distinct sessions — single-session bursts are noise
+    if (sessions.size < 2) {
+      console.log(`[aceforge] skipping ${key} — only ${sessions.size} session(s), need 2+`);
+      continue;
+    }
+
     if (hasExistingProposal(key)) {
       console.log(`[aceforge] skipping ${key} — proposal already exists`);
       continue;
