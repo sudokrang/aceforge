@@ -1,0 +1,33 @@
+{
+  "id": "aceforge",
+  "name": "AceForge",
+  "description": "Self-evolving skill engine — detects patterns, crystallizes skills, manages lifecycle",
+  "version": "0.6.0",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "crystallizationThreshold": {
+        "type": "number",
+        "default": 3
+      },
+      "successRateMinimum": {
+        "type": "number",
+        "default": 0.7
+      },
+      "retirementDays": {
+        "type": "number",
+        "default": 30
+      },
+      "notificationChannel": {
+        "type": "string",
+        "default": "auto"
+      }
+    }
+  }
+}
