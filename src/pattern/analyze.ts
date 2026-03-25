@@ -398,82 +398,92 @@ export async function analyzePatterns(): Promise<void> {
   for (const [key, entries] of groups) {
     if (entries.length < effectiveThreshold) continue;
     if (NATIVE_TOOLS.has(key)) {
-      // v0.7.6: Don't skip entirely — check for domain-specific sub-patterns
+      // v0.7.6 fix: Structural approach to native tool sub-patterns
+      // A. Canonical naming: {tool}-{domain} — LLM writes content, AceForge controls name
+      // B. Tool-level gating: if ANY {tool}-* proposal exists, skip entirely
+      // C. Max 1 per tool per cycle (strongest by occurrence count)
+
+      // B: Check if ANY proposal already exists for this native tool
+      const existingNativeProposals = fsSync.existsSync(PROPOSALS_DIR)
+        ? fsSync.readdirSync(PROPOSALS_DIR).filter(p => p.startsWith(key + "-"))
+        : [];
+      if (existingNativeProposals.length > 0) {
+        logFilteredCandidate(key, "native_pending_proposal", `${existingNativeProposals.length} pending proposal(s): ${existingNativeProposals.slice(0, 3).join(", ")}`, { existingProposals: existingNativeProposals });
+        continue;
+      }
+
       const subPatterns = clusterNativeToolPatterns(key, entries, effectiveThreshold);
       if (subPatterns.length === 0) {
         logFilteredCandidate(key, "native_no_subpattern", `${entries.length} entries but no qualifying domain clusters`, { occurrences: entries.length });
         continue;
       }
-      // Process each qualifying sub-pattern as its own candidate
-      for (const sp of subPatterns) {
-        const spSessions = new Set(sp.entries.map(e => e.session).filter(Boolean));
-        const spSuccesses = sp.entries.filter(e => e.success).length;
-        const spSuccessRate = spSuccesses / sp.entries.length;
 
-        if (hasActiveProposalOrSkill(sp.skillName)) {
-          console.log(`[aceforge] skipping sub-pattern ${sp.skillName} — already exists`);
-          continue;
-        }
-        if (hasExistingProposal(sp.skillName)) {
-          console.log(`[aceforge] skipping sub-pattern ${sp.skillName} — proposal exists`);
-          continue;
-        }
-        const existingProposal = hasProposalForSameTool(sp.skillName);
-        if (existingProposal) {
-          console.log(`[aceforge] skipping sub-pattern ${sp.skillName} — covered by '${existingProposal}'`);
-          continue;
-        }
+      // C: Pick the strongest sub-pattern only (highest occurrence count)
+      const strongest = subPatterns.sort((a, b) => b.entries.length - a.entries.length)[0];
+      const sp = strongest;
 
-        console.log(`[aceforge] native tool sub-pattern: ${sp.skillName} (${sp.entries.length}x, ${spSessions.size} sessions, ${sp.domain} domain)`);
+      // A: Canonical name — deterministic, not LLM-generated
+      const canonicalName = `${key}-${sp.domain}`;
 
-        const candidate = {
-          ts: new Date().toISOString(),
-          tool: key,
-          args_summary_prefix: sp.entries[0].args_summary?.slice(0, 50) || "",
-          occurrences: sp.entries.length,
-          success_rate: Math.round(spSuccessRate * 100) / 100,
-          distinct_sessions: spSessions.size,
-          first_seen: sp.entries[sp.entries.length - 1].ts,
-          last_seen: sp.entries[0].ts,
-        };
+      const spSessions = new Set(sp.entries.map(e => e.session).filter(Boolean));
+      const spSuccesses = sp.entries.filter(e => e.success).length;
+      const spSuccessRate = spSuccesses / sp.entries.length;
 
-        // Generate with LLM, fall back to template
-        try {
-          const llmResult = await generateSkillWithLLm(candidate);
-          if (llmResult && llmResult.verdict !== "REJECT") {
-            const nameMatch = llmResult.skillMd.match(/^name:\s*(.+)$/m);
-            const finalName = nameMatch
-              ? nameMatch[1].trim().replace(/[^a-z0-9-_]/gi, "-").toLowerCase().slice(0, 60)
-              : sp.skillName;
-            const validation = validateSkillMd(llmResult.skillMd, finalName);
-            if (validation.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
-              console.log(`[aceforge] sub-pattern ${finalName} blocked by validator`);
-              continue;
-            }
-            writeProposal(finalName, llmResult.skillMd);
-            appendJsonl("candidates.jsonl", { ...candidate, type: "native-subpattern", domain: sp.domain });
-
-            const descMatch = llmResult.skillMd.match(/^description:\s*["']?(.+?)["']?$/m);
-            const summary = descMatch ? descMatch[1].slice(0, 120) : sp.skillName;
-
-            notify(
-              `Native Tool Sub-Pattern Proposal\n` +
-              `${finalName}\n` +
-              `Tool: ${key} (${sp.domain} domain)\n` +
-              `${sp.entries.length}x, ${Math.round(spSuccessRate * 100)}% success, ${spSessions.size} sessions\n` +
-              `Summary: ${summary}\n` +
-              `Use: /forge approve ${finalName}  or  /forge reject ${finalName}`
-            ).catch(err => console.error("[aceforge] notify error:", err));
-
-            console.log(`[aceforge] sub-pattern proposal written: ${finalName}`);
-          } else {
-            console.log(`[aceforge] sub-pattern ${sp.skillName} rejected by LLM`);
-          }
-        } catch (err) {
-          console.error(`[aceforge] sub-pattern generation error for ${sp.skillName}:`, err);
-        }
+      // Check canonical name against deployed skills and proposals
+      if (hasActiveProposalOrSkill(canonicalName)) {
+        logFilteredCandidate(canonicalName, "native_skill_exists", "deployed skill or proposal already exists");
+        continue;
       }
-      continue; // Done with this native tool — move to next group
+      if (hasExistingProposal(canonicalName)) {
+        logFilteredCandidate(canonicalName, "native_proposal_exists", "proposal already pending");
+        continue;
+      }
+
+      console.log(`[aceforge] native sub-pattern: ${canonicalName} (${sp.entries.length}x, ${spSessions.size} sessions, ${sp.domain} domain)`);
+
+      const candidate = {
+        ts: new Date().toISOString(),
+        tool: key,
+        args_summary_prefix: sp.entries[0].args_summary?.slice(0, 50) || "",
+        occurrences: sp.entries.length,
+        success_rate: Math.round(spSuccessRate * 100) / 100,
+        distinct_sessions: spSessions.size,
+        first_seen: sp.entries[sp.entries.length - 1].ts,
+        last_seen: sp.entries[0].ts,
+      };
+
+      try {
+        const llmResult = await generateSkillWithLLm(candidate);
+        if (llmResult && llmResult.verdict !== "REJECT") {
+          // A: Ignore LLM's chosen name — use canonical name
+          const validation = validateSkillMd(llmResult.skillMd, canonicalName);
+          if (validation.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
+            console.log(`[aceforge] sub-pattern ${canonicalName} blocked by validator`);
+            continue;
+          }
+          writeProposal(canonicalName, llmResult.skillMd);
+          appendJsonl("candidates.jsonl", { ...candidate, type: "native-subpattern", domain: sp.domain, canonicalName });
+
+          const descMatch = llmResult.skillMd.match(/^description:\s*["']?(.+?)["']?$/m);
+          const summary = descMatch ? descMatch[1].slice(0, 120) : canonicalName;
+
+          notify(
+            `Native Tool Sub-Pattern Proposal\n` +
+            `${canonicalName}\n` +
+            `Tool: ${key} (${sp.domain} domain)\n` +
+            `${sp.entries.length}x, ${Math.round(spSuccessRate * 100)}% success, ${spSessions.size} sessions\n` +
+            `Summary: ${summary}\n` +
+            `Use: /forge approve ${canonicalName}  or  /forge reject ${canonicalName}`
+          ).catch(err => console.error("[aceforge] notify error:", err));
+
+          console.log(`[aceforge] sub-pattern proposal written: ${canonicalName}`);
+        } else {
+          console.log(`[aceforge] sub-pattern ${canonicalName} rejected by LLM`);
+        }
+      } catch (err) {
+        console.error(`[aceforge] sub-pattern generation error for ${canonicalName}:`, err);
+      }
+      continue;
     }
 
     const sessions = new Set(entries.map(e => e.session).filter(Boolean));
