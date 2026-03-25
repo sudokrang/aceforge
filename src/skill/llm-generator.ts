@@ -136,6 +136,55 @@ function sanitizeTraceField(value: string | null | undefined, maxLen: number = 1
     .slice(0, maxLen);
 }
 
+
+
+// ─── Doc Enrichment (v0.8.0) ────────────────────────────────────
+// Pre-generation context from OpenViking docs and/or docs.openclaw.ai
+// Research: Foundry's doc research during generation identified as a gap
+// in competitive analysis. This bridges trace-only generation with docs.
+
+async function fetchDocEnrichment(toolName: string): Promise<string> {
+  let context = "";
+
+  // Source 1: OpenViking with docs-scoped target_uri
+  try {
+    const { searchViking } = await import("../viking/client.js");
+    const result = await searchViking(
+      `${toolName} usage documentation API reference configuration`,
+      "viking://docs/"
+    );
+    if (result) {
+      const text = typeof result === "string" ? result :
+        Array.isArray(result) ? (result as any[]).map((r: any) => r.text || r.content || "").filter(Boolean).join("\n") :
+        JSON.stringify(result);
+      if (text.length > 20) context = text.slice(0, 600);
+    }
+  } catch { /* Viking unavailable */ }
+
+  // Source 2: docs.openclaw.ai (optional, env-configurable)
+  if (!context) {
+    const docsUrl = process.env.ACEFORGE_DOCS_URL;
+    if (docsUrl) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`${docsUrl}/api/search?q=${encodeURIComponent(toolName)}&limit=3`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json() as { results?: Array<{ content?: string }> };
+          if (data.results && data.results.length > 0) {
+            context = data.results.map((r: any) => r.content || "").join("\n").slice(0, 600);
+          }
+        }
+      } catch { /* docs.openclaw.ai unavailable */ }
+    }
+  }
+
+  return context;
+}
+
 function inferCategory(toolName: string): string {
   const tool = toolName.toLowerCase();
   if (["exec", "exec-ssh", "scp", "rsync"].includes(tool)) return "operations";
@@ -184,7 +233,7 @@ function collectTracesForCandidate(candidate: Candidate): { traces: TraceEntry[]
   return { traces, corrections: nearCorrections };
 }
 
-function buildSkillBrief(candidate: Candidate, traces: TraceEntry[], corrections: TraceEntry[]): string {
+function buildSkillBrief(candidate: Candidate, traces: TraceEntry[], corrections: TraceEntry[], docContext?: string): string {
   const successTraces = traces.filter(t => t.success);
   const failureTraces = traces.filter(t => !t.success);
 
@@ -224,6 +273,9 @@ ${correctionSamples || "None"}
 - Include an Anti-Patterns section based on any failures or corrections
 - Keep under 150 lines
 - Do NOT include credentials, API keys, or tokens
+
+## Reference Documentation (from operational context)
+\${docContext ? docContext : "No documentation context available — generate from trace data only."}
 
 Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
 }
@@ -335,7 +387,15 @@ export async function generateSkillWithLLm(candidate: Candidate): Promise<Genera
   }
 
   const { traces, corrections } = collectTracesForCandidate(candidate);
-  const brief = buildSkillBrief(candidate, traces, corrections);
+
+  // Doc enrichment: fetch relevant documentation before generation
+  let docContext = "";
+  try {
+    docContext = await fetchDocEnrichment(candidate.tool);
+    if (docContext) console.log(`[aceforge/llm-gen] Doc enrichment: ${docContext.length} chars for ${candidate.tool}`);
+  } catch { /* proceed without enrichment */ }
+
+  const brief = buildSkillBrief(candidate, traces, corrections, docContext);
 
   let generatedMd: string;
   try {

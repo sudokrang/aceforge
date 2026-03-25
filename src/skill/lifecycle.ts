@@ -600,6 +600,138 @@ export function revalidateProposals(
 
 // ─── Internal ───────────────────────────────────────────────────────────
 
+
+// ─── Maturity Stages (STEM Agent: arXiv:2603.22359) ─────────────────
+// Progenitor: generated, sitting in proposals/ (implicit — no health entries)
+// Committed: deployed, actively tracked (set on /forge approve)
+// Mature: proven through sustained performance (auto-promoted)
+//
+// Apoptosis: auto-retirement signal when skill degrades beyond recovery
+// Short-circuit: evolution from mature parent gets fast-track recommendation
+
+export type MaturityStage = "progenitor" | "committed" | "mature";
+
+const MATURE_MIN_ACTIVATIONS = 50;
+const MATURE_MIN_SUCCESS_RATE = 0.75;
+const MATURE_MIN_DAYS_DEPLOYED = 14;
+const APOPTOSIS_SUCCESS_CEILING = 0.40;
+const APOPTOSIS_IDLE_DAYS = 60;
+const APOPTOSIS_DECLINE_PP = 0.20;
+
+export function getSkillMaturity(skillName: string): MaturityStage {
+  const entries = getHealthEntries(skillName);
+  const matureEntry = entries.find(e => e.action === "maturity_transition" && (e as any).maturity === "mature");
+  if (matureEntry) return "mature";
+  const baseline = entries.find(e => e.action === "deployment_baseline");
+  if (baseline) return "committed";
+  return "progenitor";
+}
+
+export function checkMaturityTransition(skillName: string): "mature" | null {
+  const current = getSkillMaturity(skillName);
+  if (current !== "committed") return null;
+
+  const stats = getSkillStats(skillName);
+  if (stats.activations < MATURE_MIN_ACTIVATIONS) return null;
+  if (stats.successRate < MATURE_MIN_SUCCESS_RATE) return null;
+
+  const entries = getHealthEntries(skillName);
+  const baseline = entries.find(e => e.action === "deployment_baseline");
+  if (!baseline) return null;
+  const daysSinceDeploy = (Date.now() - new Date(baseline.ts).getTime()) / (24 * 60 * 60 * 1000);
+  if (daysSinceDeploy < MATURE_MIN_DAYS_DEPLOYED) return null;
+
+  // No watchdog flags in last 7 days
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recentFlags = entries.filter(e =>
+    (e.action === "watchdog_flag" || e.action === "revision_flagged") &&
+    new Date(e.ts).getTime() > weekAgo
+  );
+  if (recentFlags.length > 0) return null;
+
+  // Promote to mature
+  const healthFile = path.join(FORGE_DIR, "skill-health.jsonl");
+  fsSync.appendFileSync(healthFile, JSON.stringify({
+    ts: new Date().toISOString(),
+    skill: skillName,
+    action: "maturity_transition",
+    maturity: "mature",
+    activations: stats.activations,
+    successRate: stats.successRate,
+    daysSinceDeploy: Math.round(daysSinceDeploy),
+  }) + "\n");
+  invalidateHealthCache(skillName);
+  return "mature";
+}
+
+export interface ApoptosisSignal {
+  skill: string;
+  reason: "sustained_failure" | "idle" | "decline";
+  detail: string;
+}
+
+export function checkApoptosis(skillName: string): ApoptosisSignal | null {
+  const stats = getSkillStats(skillName);
+  const entries = getHealthEntries(skillName);
+  const baseline = entries.find(e => e.action === "deployment_baseline");
+
+  // Sustained failure: <40% success after 100+ activations
+  if (stats.activations >= 100 && stats.successRate < APOPTOSIS_SUCCESS_CEILING) {
+    return {
+      skill: skillName,
+      reason: "sustained_failure",
+      detail: `${Math.round(stats.successRate * 100)}% success over ${stats.activations} activations`,
+    };
+  }
+
+  // Idle: 60+ days since last activation
+  if (stats.daysSinceActivation !== null && stats.daysSinceActivation >= APOPTOSIS_IDLE_DAYS) {
+    return {
+      skill: skillName,
+      reason: "idle",
+      detail: `${stats.daysSinceActivation} days since last activation`,
+    };
+  }
+
+  // Decline: success dropped 20+pp from baseline after 50+ activations
+  if (baseline && typeof baseline.baselineSuccessRate === "number" && stats.activations >= 50) {
+    const decline = baseline.baselineSuccessRate - stats.successRate;
+    if (decline >= APOPTOSIS_DECLINE_PP) {
+      return {
+        skill: skillName,
+        reason: "decline",
+        detail: `${Math.round(stats.successRate * 100)}% vs ${Math.round(baseline.baselineSuccessRate * 100)}% baseline (-${Math.round(decline * 100)}pp)`,
+      };
+    }
+  }
+
+  return null;
+}
+
+export function isShortCircuitCandidate(parentSkillName: string): boolean {
+  if (getSkillMaturity(parentSkillName) !== "mature") return false;
+  const stats = getSkillStats(parentSkillName);
+  return stats.successRate >= 0.80 && stats.activations >= 100;
+}
+
+export function runMaturityChecks(): Array<{ skill: string; transition: string }> {
+  const transitions: Array<{ skill: string; transition: string }> = [];
+  for (const skill of listActiveSkills()) {
+    const result = checkMaturityTransition(skill);
+    if (result) transitions.push({ skill, transition: result });
+  }
+  return transitions;
+}
+
+export function runApoptosisChecks(): ApoptosisSignal[] {
+  const signals: ApoptosisSignal[] = [];
+  for (const skill of listActiveSkills()) {
+    const signal = checkApoptosis(skill);
+    if (signal) signals.push(signal);
+  }
+  return signals;
+}
+
 function logHealth(skill: string, action: string): void {
   const healthFile = path.join(FORGE_DIR, "skill-health.jsonl");
   const entry = JSON.stringify({ ts: new Date().toISOString(), skill, action }) + "\n";

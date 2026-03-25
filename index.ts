@@ -32,6 +32,11 @@ import {
   getRewardSignals,
   runEffectivenessWatchdog,
   revalidateProposals,
+  getSkillMaturity,
+  checkMaturityTransition,
+  runMaturityChecks,
+  runApoptosisChecks,
+  isShortCircuitCandidate,
 } from "./src/skill/lifecycle.js";
 import { checkVikingHealth } from "./src/viking/client.js";
 import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";
@@ -384,6 +389,37 @@ function buildPlugin() {
           } catch (err) {
             log.error(`[aceforge] auto-adjust routing error: ${(err as Error).message}`);
           }
+
+          // Phase 4: Maturity stage transitions
+          try {
+            const transitions = runMaturityChecks();
+            for (const t of transitions) {
+              notify(
+                `Skill Maturity Promotion\n` +
+                `${t.skill} → ${t.transition}\n` +
+                `Criteria met: 50+ activations, 75%+ success, 14+ days deployed`
+              ).catch(() => {});
+              log.info(`[aceforge] maturity: ${t.skill} promoted to ${t.transition}`);
+            }
+          } catch (err) {
+            log.error(`[aceforge] maturity check error: ${(err as Error).message}`);
+          }
+
+          // Phase 4: Apoptosis detection
+          try {
+            const signals = runApoptosisChecks();
+            for (const s of signals) {
+              notify(
+                `Skill Apoptosis Signal\n` +
+                `${s.skill}: ${s.reason.replace(/_/g, " ")}\n` +
+                `${s.detail}\n` +
+                `Consider: /forge retire ${s.skill}`
+              ).catch(() => {});
+              log.warn(`[aceforge] apoptosis: ${s.skill} — ${s.reason}: ${s.detail}`);
+            }
+          } catch (err) {
+            log.error(`[aceforge] apoptosis check error: ${(err as Error).message}`);
+          }
         }); // end setImmediate
       });
 
@@ -566,9 +602,11 @@ function buildPlugin() {
                 text += `Active (${active.length}):\n`;
                 for (const name of active) {
                   const stats = getSkillStats(name);
+                  const maturity = getSkillMaturity(name);
+                  const mBadge = maturity === "mature" ? "🟣" : maturity === "committed" ? "🔵" : "⚪";
                   text += stats.activations > 0
-                    ? `  ${name}: ${stats.activations} acts, ${Math.round(stats.successRate * 100)}% succ (${stats.daysSinceActivation ?? "?"}d ago)\n`
-                    : `  ${name}: no activations yet\n`;
+                    ? `  ${mBadge} ${name} [${maturity}]: ${stats.activations} acts, ${Math.round(stats.successRate * 100)}% succ (${stats.daysSinceActivation ?? "?"}d ago)\n`
+                    : `  ${mBadge} ${name} [${maturity}]: no activations yet\n`;
                 }
               }
 
@@ -727,7 +765,11 @@ function buildPlugin() {
               const proposals = listProposals();
               const retired = listRetiredSkills();
               let text = "AceForge Inventory\n\n";
-              text += `Active (${active.length}):\n${active.length === 0 ? "  none\n" : active.map(s => `  ✓ ${s}`).join("\n") + "\n"}`;
+              text += `Active (${active.length}):\n${active.length === 0 ? "  none\n" : active.map(s => {
+                const m = getSkillMaturity(s);
+                const badge = m === "mature" ? "🟣" : m === "committed" ? "🔵" : "⚪";
+                return `  ${badge} ${s} [${m}]`;
+              }).join("\n") + "\n"}`;
               text += `\nProposals (${proposals.length}):\n${proposals.length === 0 ? "  none\n" : proposals.map(s => `  ◌ ${s}`).join("\n") + "\n"}`;
               text += `\nRetired (${retired.length}):\n${retired.length === 0 ? "  none\n" : retired.map(s => `  ✗ ${s}`).join("\n") + "\n"}`;
               return { text };
@@ -877,6 +919,20 @@ function buildPlugin() {
                   }
                 }
               } catch { /* no candidates file */ }
+
+              // ── Maturity stage ──
+              if (previewSource === "INSTALLED") {
+                const maturity = getSkillMaturity(subArgs);
+                const mIcon = maturity === "mature" ? "\u2705 Mature" : maturity === "committed" ? "\u2139\ufe0f Committed" : "\u26a0\ufe0f Progenitor";
+                t += `\n  \u2500\u2500 Maturity \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                t += `  ${mIcon}\n`;
+                if (maturity === "committed") {
+                  const mStats = getSkillStats(subArgs);
+                  const needed = 50 - mStats.activations;
+                  if (needed > 0) t += `  ${needed} more activations + 75% success + 14d to reach mature\n`;
+                  else t += `  Checking success rate and deployment age for promotion...\n`;
+                }
+              }
 
               // ── Readiness checks ──
               const hasWhenToUse = /##?\s*when\s+to\s+use/i.test(md);
