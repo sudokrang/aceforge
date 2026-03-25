@@ -1,6 +1,6 @@
 {
   "name": "aceforge",
-  "version": "0.7.6",
+  "version": "0.8.0",
   "type": "module",
   "main": "index.ts",
   "openclaw": {
@@ -41,6 +41,6 @@
     "type": "git",
     "url": "https://github.com/sudokrang/aceforge"
   },
-  "description": "Self-evolving skill engine for OpenClaw agents — Phase 1 core + Phase 2 proactive intelligence + Phase 3 self-validation",
+  "description": "Self-evolving skill engine for OpenClaw agents \u2014 Phase 1 core + Phase 2 proactive intelligence + Phase 3 self-validation",
   "license": "MIT"
 }

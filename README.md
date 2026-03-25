@@ -6,7 +6,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://openclaw.ai"><img src="https://img.shields.io/badge/OpenClaw-Plugin-orange" alt="OpenClaw Plugin"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.7.4-green" alt="Version"></a>
+  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.8.0-green" alt="Version"></a>
   <img src="https://img.shields.io/badge/tests-346%2F346-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/adversarial-19%2F19-brightgreen" alt="Adversarial">
 </p>
@@ -176,7 +176,7 @@ Patterns recurring across 3+ sessions become high-priority crystallization candi
 
 ### Skill Composition Detection
 
-When two skills co-activate in >50% of sessions across 5+ sessions, AceForge detects the co-activation pattern and reports it as a composition candidate. The detection uses per-session tool matching against active skill prefixes.
+When two skills co-activate in >50% of sessions across 3+ sessions, AceForge detects the co-activation pattern and reports it as a composition candidate. The detection uses per-session tool matching against active skill prefixes.
 
 **Design intent:** [AgentSkillOS (arXiv:2603.02176)](https://arxiv.org/abs/2603.02176) found that DAG-based pipelines substantially outperform flat invocation even with identical skill sets. AceForge's composition detection identifies the candidates; DAG orchestration is the target for future composition generation.
 
@@ -294,7 +294,7 @@ AceForge uses a single `/forge` command with subcommands:
 |---|---|
 | `/forge` | Dashboard — skills, proposals, patterns, gaps |
 | `/forge approve <n>` | Deploy a proposed skill |
-| `/forge reject <n>` | Reject a proposal |
+| `/forge reject <n>` | Reject a proposal (or `reject all`) |
 | `/forge upgrade <n>` | Deploy upgrade, retire old (with validation) |
 | `/forge rollback <n>` | Undo an upgrade (with validation) |
 | `/forge retire <n>` | Retire an active skill |
@@ -308,6 +308,8 @@ AceForge uses a single `/forge` command with subcommands:
 | `/forge quality <n>` | Score a skill against actual usage data |
 | `/forge gaps` | All capability gaps — tool failures + behavior + cross-session |
 | `/forge watchdog` | Effectiveness check — flags underperformers |
+| `/forge filtered` | What quality gates suppressed and why |
+| `/forge preview <n>` | Human-readable skill brief before approving |
 
 ### Intelligence
 
@@ -350,7 +352,7 @@ openclaw plugins list | grep aceforge
 Expected:
 
 ```
-[aceforge] v0.7.4 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)
+[aceforge] v0.8.0 — all hooks, tools, and commands registered (Phase 1 + 2 + 3)
 ```
 
 ---
