@@ -482,6 +482,7 @@ export async function analyzePatterns(): Promise<void> {
         }
       } catch (err) {
         console.error(`[aceforge] sub-pattern generation error for ${canonicalName}:`, err);
+        logFilteredCandidate(canonicalName, "subpattern_error", `Sub-pattern generation failed: ${(err as Error).message?.slice(0, 100) || "unknown"}`, { occurrences: sp.entries.length });
       }
       continue;
     }
@@ -542,6 +543,7 @@ export async function analyzePatterns(): Promise<void> {
             }
           } catch (evoErr) {
             console.error(`[aceforge] evolution error: ${(evoErr as Error).message}`);
+            logFilteredCandidate(key, "evolution_error", `Evolution generation failed: ${(evoErr as Error).message?.slice(0, 100) || "unknown"}`, { occurrences: entries.length });
           }
         }
       }
@@ -617,6 +619,7 @@ export async function analyzePatterns(): Promise<void> {
           }
         } catch (err) {
           console.error(`[aceforge] upgrade scoring error: ${(err as Error).message}`);
+          logFilteredCandidate(key, "upgrade_error", `Upgrade scoring failed: ${(err as Error).message?.slice(0, 100) || "unknown"}`, { occurrences: entries.length });
         }
       }
       continue;
@@ -742,6 +745,7 @@ export async function analyzePatterns(): Promise<void> {
       }
     } catch (err) {
       console.error(`[aceforge] proposal generation error for ${key}:`, err);
+      logFilteredCandidate(key, "generation_error", `LLM generation failed: ${(err as Error).message?.slice(0, 100) || "unknown"}`, { occurrences: entries.length });
       continue;
     }
 

@@ -81,6 +81,15 @@ function flushSessionHistory(): void {
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = setTimeout(() => {
     try {
+      // Audit fix: prune sessions with no entries in the last 10 minutes
+      const PRUNE_MS = 10 * 60 * 1000;
+      const now = Date.now();
+      for (const [key, entries] of sessionToolHistory) {
+        if (entries.length === 0 || now - entries[entries.length - 1].ts > PRUNE_MS) {
+          sessionToolHistory.delete(key);
+        }
+      }
+
       const obj: Record<string, { tool: string; ts: number }[]> = {};
       for (const [key, entries] of sessionToolHistory) {
         if (entries.length > 0) obj[key] = entries;
