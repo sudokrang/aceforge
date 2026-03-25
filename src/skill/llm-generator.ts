@@ -90,7 +90,7 @@ const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
 let _configCache: { config: LlmConfig; ts: number } | null = null;
 const CONFIG_CACHE_TTL_MS = 60_000; // 60 seconds
 
-function loadLlmConfig(): LlmConfig {
+export function loadLlmConfig(): LlmConfig {
   // Return cached config if still fresh
   if (_configCache && Date.now() - _configCache.ts < CONFIG_CACHE_TTL_MS) {
     return _configCache.config;

@@ -9,6 +9,7 @@ import * as fsSync from "fs";
 import * as path from "path";
 import * as os from "os";
 import type { QualityReport } from "./quality-score.js";
+import { loadLlmConfig } from "./llm-generator.js";
 
 // ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
 const HOME = os.homedir() || process.env.HOME || "";
@@ -34,11 +35,7 @@ async function rateLimitedFetch(url: string, init: RequestInit): Promise<Respons
   return fetch(url, init);
 }
 
-interface LlmConfig {
-  reviewerKey: string;
-  reviewerUrl: string;
-  reviewerModel: string;
-}
+// Config imported from llm-generator
 
 const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
   deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-reasoner" },
@@ -48,32 +45,9 @@ const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
 };
 
 // ─── Config cache (avoids reading openclaw.json on every call) ──
-let _configCache: { config: LlmConfig; ts: number } | null = null;
 const CONFIG_CACHE_TTL_MS = 60_000; // 60 seconds
 
-function loadConfig(): LlmConfig {
-  // Return cached config if still fresh
-  if (_configCache && Date.now() - _configCache.ts < CONFIG_CACHE_TTL_MS) {
-    return _configCache.config;
-  }
-  const cfgPath = path.join(HOME, ".openclaw", "openclaw.json");
-  let cfg: Record<string, unknown> = {};
-  try { cfg = JSON.parse(fsSync.readFileSync(cfgPath, "utf-8")); } catch {}
 
-  const providers = (cfg as any)?.models?.providers as Record<string, Record<string, string>> | undefined;
-  const revProvider = process.env.ACEFORGE_REVIEWER_PROVIDER || "deepseek";
-  const revCfg = providers?.[revProvider] || {};
-  const revDef = PROVIDER_DEFAULTS[revProvider] || { url: "", model: "" };
-
-  const result: LlmConfig = {
-    reviewerKey: revCfg.apiKey || process.env.ACEFORGE_REVIEWER_API_KEY || "",
-    reviewerUrl: (revCfg.baseURL || process.env.ACEFORGE_REVIEWER_URL || revDef.url).replace(/\/$/, ""),
-    reviewerModel: process.env.ACEFORGE_REVIEWER_MODEL || revDef.model,
-  };
-
-  _configCache = { config: result, ts: Date.now() };
-  return result;
-}
 
 export interface JudgeResult {
   adjustedScore: number;
@@ -87,7 +61,7 @@ export async function llmJudgeEvaluate(
   deterministicReport: QualityReport,
   traceSamples: string
 ): Promise<JudgeResult | null> {
-  const config = loadConfig();
+  const config = loadLlmConfig();
   if (!config.reviewerKey) {
     console.log("[aceforge/judge] No reviewer API key — skipping LLM judge");
     return null;
