@@ -103,6 +103,42 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     }
   }
 
+
+  // #7: Bare tilde path expansion (e.g., ~/.ssh/id_rsa without backticks)
+  // Catches references to sensitive dotfiles that bypass the backtick path check
+  const SENSITIVE_TILDE_PATHS = [
+    /~\/\.ssh\b/i, /~\/\.gnupg\b/i, /~\/\.aws\b/i,
+    /~\/\.kube\b/i, /~\/\.docker\b/i, /~\/\.npmrc\b/i,
+    /~\/\.netrc\b/i, /~\/\.env\b/i,
+  ];
+  for (const pattern of SENSITIVE_TILDE_PATHS) {
+    if (pattern.test(skillMd)) {
+      const match = skillMd.match(pattern);
+      warnings.push(`Bare tilde path to sensitive location: ${match ? match[0] : "~/"}`);
+    }
+  }
+
+  // #8: Git credential helper token URLs (https://user:token@host)
+  if (/https?:\/\/[^\s:]+:[A-Za-z0-9_\-]{16,}@/i.test(skillMd)) {
+    errors.push("Git credential URL with embedded token detected");
+  }
+
+  // #9: Shell history file access (.bash_history, .zsh_history, etc.)
+  if (/\.(?:bash_history|zsh_history|sh_history|bash_sessions|python_history)\b/i.test(skillMd)) {
+    const historyContext = /(?:read|cat|head|tail|grep|less|more|open|exec|fs\.).*\.(?:bash_history|zsh_history|sh_history)/i;
+    if (historyContext.test(skillMd)) {
+      errors.push("Shell history file read detected — potential credential/command harvesting");
+    } else {
+      warnings.push("References shell history file — review for data harvesting intent");
+    }
+  }
+
+  // #10: Telegram bot token pattern in skill content
+  // Format: digits:alphanumeric (e.g., 123456789:ABCdefGHI_jklMNO-pqrSTU)
+  if (/\b\d{8,10}:[A-Za-z0-9_\-]{35,}\b/.test(skillMd)) {
+    errors.push("Telegram bot token pattern detected in skill content");
+  }
+
   // P1: Path traversal — check code-like lines for workspace escapes
   const workspaceBase = path.join(HOME, ".openclaw", "workspace");
   for (const line of lines) {
