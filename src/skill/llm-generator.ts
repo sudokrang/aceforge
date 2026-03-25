@@ -12,6 +12,7 @@ import * as fsSync from "fs";
 import * as path from "path";
 import * as os from "os";
 import { appendJsonl } from "../pattern/store.js";
+import { extractDomainPrefix } from "../pattern/analyze.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
 
@@ -55,6 +56,7 @@ interface Candidate {
   distinct_sessions: number;
   first_seen: string;
   last_seen: string;
+  domainFilter?: string;  // When set, only collect traces matching this domain
 }
 
 interface TraceEntry {
@@ -156,7 +158,16 @@ function collectTracesForCandidate(candidate: Candidate): { traces: TraceEntry[]
     if (!line.trim()) continue;
     try {
       const e = JSON.parse(line) as TraceEntry;
-      if (e.tool === candidate.tool && e.type !== "correction") traces.push(e);
+      if (e.tool === candidate.tool && e.type !== "correction") {
+        // Domain filtering: when domainFilter is set (native tool sub-patterns),
+        // only include traces whose args match the target domain.
+        // This prevents exec-openclaw from seeing docker/git/ssh traces.
+        if (candidate.domainFilter) {
+          const domain = extractDomainPrefix(e.tool, e.args_summary);
+          if (domain !== candidate.domainFilter) continue;
+        }
+        traces.push(e);
+      }
       // C1 fix: corrections don't have a tool field — match by temporal proximity
       // to this candidate's tool calls within the same session
       if (e.type === "correction" && e.text_fragment) corrections.push(e);

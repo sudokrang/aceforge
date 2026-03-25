@@ -103,7 +103,7 @@ function readPatternsFile(): PatternEntry[] {
 // Extracts a domain prefix from tool arguments to enable sub-pattern clustering.
 // exec with docker args → "docker", exec with ssh args → "ssh", etc.
 
-function extractDomainPrefix(toolName: string, argsSummary: string | null): string | null {
+export function extractDomainPrefix(toolName: string, argsSummary: string | null): string | null {
   if (!argsSummary) return null;
   const args = argsSummary.toLowerCase();
 
@@ -451,6 +451,7 @@ export async function analyzePatterns(): Promise<void> {
         distinct_sessions: spSessions.size,
         first_seen: sp.entries[sp.entries.length - 1].ts,
         last_seen: sp.entries[0].ts,
+        domainFilter: sp.domain,  // Filter traces to this domain only
       };
 
       try {
