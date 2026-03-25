@@ -120,13 +120,17 @@ function resolveSkillActivation(toolName: string, _argsSummary: string | null): 
     // Match 1: exact name match (skill "tavily" matches tool "tavily")
     if (skillName === toolName) return skillName;
 
-    // Match 2: skill name starts with tool name + dash
+    // Match 2: skill name starts with tool name + dash (forward match)
     // "read-code" starts with "read-" → matches tool "read"
     // "exec-openclaw" starts with "exec-" → matches tool "exec"
-    // "gateway-config" starts with "gateway-" → matches tool "gateway"
     if (skillName.startsWith(toolName + "-")) return skillName;
 
-    // Match 3: explicit tool metadata in frontmatter
+    // Match 3: tool name starts with skill name + separator (reverse match)
+    // tool "tavily_search" starts with "tavily" + "_" → matches skill "tavily"
+    // tool "tavily_extract" starts with "tavily" + "_" → matches skill "tavily"
+    if (toolName.startsWith(skillName + "_") || toolName.startsWith(skillName + "-")) return skillName;
+
+    // Match 4: explicit tool metadata in frontmatter
     const skillFile = path.join(skillDir, "SKILL.md");
     if (!fsSync.existsSync(skillFile)) continue;
 
@@ -135,10 +139,19 @@ function resolveSkillActivation(toolName: string, _argsSummary: string | null): 
       const toolMatch = content.match(/^\s*tool:\s*(.+)$/m);
       if (toolMatch && toolMatch[1].trim() === toolName) return skillName;
 
-      // Match 4: bundledTools list in frontmatter
+      // Match 5: bundledTools list in frontmatter
       const bundledMatch = content.match(/bundledTools:\s*\[([^\]]+)\]/);
       if (bundledMatch) {
         const tools = bundledMatch[1].split(",").map(t => t.trim().replace(/['"]/g, ""));
+        if (tools.includes(toolName)) return skillName;
+      }
+
+      // Match 6: multi-line bundledTools YAML array
+      const multiMatch = content.match(/bundledTools:\s*\n((?:\s+-\s+\S+\n?)+)/);
+      if (multiMatch) {
+        const tools = multiMatch[1].split("\n")
+          .map(l => l.replace(/^\s*-\s*/, "").trim().replace(/['"]/g, ""))
+          .filter(Boolean);
         if (tools.includes(toolName)) return skillName;
       }
     } catch { /* skip unreadable */ }
