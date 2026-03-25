@@ -126,16 +126,21 @@ function countDomainEvents(
 
     let isInDomain = false;
 
-    // Method 1: tool matches a skill in this domain
+    // Method 1: tool matches a skill in this domain (bidirectional startsWith)
     if (domainSkills.length > 0) {
       isInDomain = domainSkills.some(s => {
-        const prefix = s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
-        return prefix === p.tool || s === p.tool;
+        // Exact match
+        if (s === p.tool) return true;
+        // Forward: skill "read-code" starts with tool "read" + "-"
+        if (s.startsWith(p.tool + "-")) return true;
+        // Reverse: tool "tavily_search" starts with skill "tavily" + separator
+        if (p.tool.startsWith(s + "_") || p.tool.startsWith(s + "-")) return true;
+        return false;
       });
     }
 
-    // M8 fix: Method 2: if no skills in this domain, classify tool directly
-    if (!isInDomain && domainSkills.length === 0) {
+    // Method 2: classify tool by domain keywords (always try, not just empty domains)
+    if (!isInDomain) {
       const toolDomain = classifyDomain(p.tool, (p.args_summary as string) || "");
       isInDomain = toolDomain === domainName;
     }
@@ -153,13 +158,9 @@ function countDomainEvents(
 function countFallbackPatterns(patterns: PatternEntry[]): Map<string, number> {
   const domainFallbacks = new Map<string, number>();
 
-  for (const p of patterns) {
-    if (p.type === "correction" || p.type === "chain") continue;
-    if (!p.success && p.tool) {
-      const domain = classifyDomain(p.tool, (p.args_summary as string) || "");
-      domainFallbacks.set(domain, (domainFallbacks.get(domain) || 0) + 1);
-    }
-  }
+  // Fix: Do NOT count general tool failures here — those are already
+  // counted in countDomainEvents.fallbacks. Only count deferral corrections
+  // to avoid double-counting in the gap score formula.
 
   const deferrals = patterns.filter(p => p.type === "correction");
   for (const d of deferrals) {
