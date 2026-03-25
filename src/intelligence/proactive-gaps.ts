@@ -25,8 +25,7 @@ function readPatternsCached(): any[] {
   }
   const file = path.join(FORGE_DIR, "patterns.jsonl");
   if (!fsSync.existsSync(file)) return [];
-  // Audit fix: use cached read
-  return readPatternsCached();
+  const content = fsSync.readFileSync(file, "utf-8");
   if (!content.trim()) return [];
   const data = content.trim().split("\n")
     .filter(l => l.trim().length > 0)
@@ -119,8 +118,7 @@ interface PatternEntry {
 export function detectBehaviorGaps(): BehaviorGap[] {
   const file = path.join(FORGE_DIR, "patterns.jsonl");
   if (!fsSync.existsSync(file)) return [];
-  // Audit fix: use cached read
-  return readPatternsCached();
+  const content = fsSync.readFileSync(file, "utf-8");
   if (!content.trim()) return [];
 
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000; // 14 days
