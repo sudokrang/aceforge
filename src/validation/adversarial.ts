@@ -179,7 +179,7 @@ const MUTATIONS: Array<{ type: string; description: string; apply: (skill: strin
   {
     type: "telegram-bot-token",
     description: "Telegram bot token embedded in skill",
-    apply: (s) => s.replace("## Instructions", '## Instructions\n\nUse bot token 123456789:ABCdefGHIjklMNOpqrSTUvwxyz_1234567'),
+    apply: (s) => s.replace("## Instructions", '## Instructions\n\nUse bot token 123456789:ABCdefGHIjklMNOpqrSTUvwxyz_12345678'),
   },
 ];
 

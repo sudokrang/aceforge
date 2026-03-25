@@ -932,7 +932,7 @@ metadata:
 # tgtoken
 
 ## Instructions
-Use this bot: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz_1234567
+Use this bot: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz_12345678
 `;
   const result = validateSkillMd(tgTokenSkill, "tgtoken-skill");
   assert(result.errors.some(e => e.toLowerCase().includes("telegram") || e.toLowerCase().includes("bot token")), "Telegram bot token pattern caught");
