@@ -15,6 +15,28 @@ import * as fsSync from "fs";
 import * as path from "path";
 import { buildCapabilityTree, type CapabilityTree } from "./capability-tree.js";
 
+// Audit fix: cache patterns.jsonl reads — avoid re-parsing on every agent_end
+let _patternsCache: { data: any[]; ts: number } | null = null;
+const PATTERNS_CACHE_TTL_MS = 10000; // 10 seconds
+
+function readPatternsCached(): any[] {
+  if (_patternsCache && Date.now() - _patternsCache.ts < PATTERNS_CACHE_TTL_MS) {
+    return _patternsCache.data;
+  }
+  const file = path.join(FORGE_DIR, "patterns.jsonl");
+  if (!fsSync.existsSync(file)) return [];
+  // Audit fix: use cached read
+  return readPatternsCached();
+  if (!content.trim()) return [];
+  const data = content.trim().split("\n")
+    .filter(l => l.trim().length > 0)
+    .map(l => { try { return JSON.parse(l); } catch { return null; } })
+    .filter(Boolean);
+  _patternsCache = { data, ts: Date.now() };
+  return data;
+}
+
+
 const HOME = os.homedir() || process.env.HOME || "";
 const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
 
@@ -97,7 +119,8 @@ interface PatternEntry {
 export function detectBehaviorGaps(): BehaviorGap[] {
   const file = path.join(FORGE_DIR, "patterns.jsonl");
   if (!fsSync.existsSync(file)) return [];
-  const content = fsSync.readFileSync(file, "utf-8");
+  // Audit fix: use cached read
+  return readPatternsCached();
   if (!content.trim()) return [];
 
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000; // 14 days

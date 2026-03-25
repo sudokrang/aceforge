@@ -13,6 +13,7 @@
  * Research: Memento-Skills (arXiv:2603.18743) write phase — "the agent updates
  * and expands its skill library based on new experience."
  */
+import { appendJsonl } from "../pattern/store.js";
 import * as os from "os";
 import * as fsSync from "fs";
 import * as path from "path";
@@ -175,6 +176,17 @@ export function handleCorrectionForSkill(
       `Consider a full rewrite: /forge quality ${matchedSkill}`
     ).catch(console.error);
   }
+
+  // Audit fix: log corrections that couldn't be routed to any skill
+  // This makes them visible in /forge filtered
+  appendJsonl("filtered-candidates.jsonl", {
+    ts: new Date().toISOString(),
+    tool: toolName,
+    reason: "correction_no_skill",
+    detail: `Correction received but no deployed skill matches tool '${toolName}'`,
+    correction_text: correctionText?.slice(0, 100) || "",
+  });
+  console.log(`[aceforge] correction for '${toolName}' discarded — no matching skill deployed`);
 }
 
 // ─── Get Adjustment History ─────────────────────────────────────────────

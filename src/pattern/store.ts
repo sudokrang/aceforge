@@ -42,6 +42,17 @@ function rotateFile(fileName: string): void {
 
   if (!shouldRotate) return;
 
+  // Audit fix: use lockfile to prevent concurrent rotation
+  const lockFile = path.join(FORGE_DIR, `.${fileName}.lock`);
+  try {
+    // O_EXCL fails if file exists — atomic check-and-create
+    const fd = fsSync.openSync(lockFile, fsSync.constants.O_CREAT | fsSync.constants.O_EXCL | fsSync.constants.O_WRONLY);
+    fsSync.closeSync(fd);
+  } catch {
+    // Lock file exists — another rotation in progress
+    return;
+  }
+
   rotating = true;
   try {
     const stamp = new Date().toISOString().slice(0, 10);
@@ -57,6 +68,7 @@ function rotateFile(fileName: string): void {
     console.error(`[aceforge] rotation failed for ${fileName}: ${(err as Error).message}`);
   } finally {
     rotating = false;
+    try { fsSync.unlinkSync(lockFile); } catch { /* lock cleanup */ }
   }
 }
 

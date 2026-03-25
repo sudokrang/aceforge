@@ -207,7 +207,9 @@ export function autoFlagForRevision(skillName: string, failureContext: string): 
   );
 
   const revised = lines.join("\n");
-  const revName = `${skillName}-rev1`;
+  // Audit fix: use timestamp to avoid overwriting previous revisions
+  const revTs = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const revName = `${skillName}-rev-${revTs}`;
   const revDir = path.join(FORGE_DIR, "proposals", revName);
   fsSync.mkdirSync(revDir, { recursive: true });
   fsSync.writeFileSync(path.join(revDir, "SKILL.md"), revised, "utf-8");
@@ -217,7 +219,7 @@ export function autoFlagForRevision(skillName: string, failureContext: string): 
       `Skill Flagged for Revision\n` +
       `${skillName}\n` +
       `Cause: ${failureContext}\n` +
-      `Review: /forge_approve ${revName}`
+      `Review: /forge approve ${revName}`
     ).catch(console.error);
   }).catch(console.error);
 }
