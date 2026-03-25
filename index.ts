@@ -809,22 +809,32 @@ function buildPlugin() {
               const mistakes: string[] = [];
               const antiSection = md.match(/##\s*Anti[- ]?Patterns[\s\S]*?(?=\n##\s|$)/i);
               if (antiSection) {
-                const bullets = antiSection[0].match(/^\s*[-*]\s+\*\*(.+?)\*\*/gm);
+                const bullets = antiSection[0].match(/^\s*[-*]\s+\*\*.+\*\*.*$/gm);
                 if (bullets) {
                   for (const b of bullets.slice(0, 5)) {
-                    let clean = b.replace(/^\s*[-*]\s+\*\*/, "").replace(/\*\*.*$/, "").trim();
-                    // Remove leading "Never " or "Do not " for cleaner display
-                    clean = clean.replace(/^[Nn]ever\s+/, "").replace(/^[Dd]o\s+not\s+/, "");
+                    // Extract everything after the closing ** — that's the actual mistake
+                    let clean = b.replace(/^\s*[-*]\s+\*\*[^*]+\*\*\s*/, "").trim();
+                    // If nothing after **, the entire bold text IS the content (e.g., "**Do not pass path with raw**")
+                    if (clean.length < 4) {
+                      clean = b.replace(/^\s*[-*]\s+\*\*/, "").replace(/\*\*.*$/, "").trim();
+                    }
+                    // Strip leading connectors and "Never"/"Do not" prefixes
+                    clean = clean.replace(/^[-—:,]\s*/, "");
+                    clean = clean.replace(/^[Nn]ever\s+/, "").replace(/^[Dd]o\s+not\s+/, "").replace(/^[Dd]on't\s+/, "");
+                    // Strip trailing " — causes X errors" explanations for cleaner display
+                    clean = clean.replace(/\s*[-—]\s+(?:this|causes|which|because).*$/i, "");
                     if (clean.length > 3) mistakes.push(clean.charAt(0).toUpperCase() + clean.slice(1));
                   }
                 }
               }
               // Fallback: look for "Never" bullets anywhere
               if (mistakes.length === 0) {
-                const neverBullets = md.match(/^\s*[-*]\s+\*\*[Nn]ever\*\*\s+(.{5,80})/gm);
+                const neverBullets = md.match(/^\s*[-*]\s+\*\*[Nn]ever\*\*\s+.{5,}/gm);
                 if (neverBullets) {
                   for (const b of neverBullets.slice(0, 4)) {
-                    const clean = b.replace(/^\s*[-*]\s+\*\*[Nn]ever\*\*\s+/, "").replace(/\s*[-\u2014].*$/, "").trim();
+                    let clean = b.replace(/^\s*[-*]\s+\*\*[Nn]ever\*\*\s+/, "").trim();
+                    // Strip trailing explanation after dash
+                    clean = clean.replace(/\s*[-—]\s+(?:this|causes|which|because).*$/i, "");
                     if (clean.length > 3) mistakes.push(clean.charAt(0).toUpperCase() + clean.slice(1));
                   }
                 }
