@@ -117,19 +117,30 @@ function resolveSkillActivation(toolName: string, _argsSummary: string | null): 
       if (!fsSync.statSync(skillDir).isDirectory()) continue;
     } catch { continue; }
 
-    // Match by name prefix: "exec-operations" matches tool "exec"
-    const namePrefix = skillName.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "");
-    if (namePrefix === toolName) return skillName;
+    // Match 1: exact name match (skill "tavily" matches tool "tavily")
+    if (skillName === toolName) return skillName;
 
-    // Also check explicit tool metadata in frontmatter
+    // Match 2: skill name starts with tool name + dash
+    // "read-code" starts with "read-" → matches tool "read"
+    // "exec-openclaw" starts with "exec-" → matches tool "exec"
+    // "gateway-config" starts with "gateway-" → matches tool "gateway"
+    if (skillName.startsWith(toolName + "-")) return skillName;
+
+    // Match 3: explicit tool metadata in frontmatter
     const skillFile = path.join(skillDir, "SKILL.md");
     if (!fsSync.existsSync(skillFile)) continue;
 
     try {
       const content = fsSync.readFileSync(skillFile, "utf-8");
-      // Check aceforge.tool metadata field
       const toolMatch = content.match(/^\s*tool:\s*(.+)$/m);
       if (toolMatch && toolMatch[1].trim() === toolName) return skillName;
+
+      // Match 4: bundledTools list in frontmatter
+      const bundledMatch = content.match(/bundledTools:\s*\[([^\]]+)\]/);
+      if (bundledMatch) {
+        const tools = bundledMatch[1].split(",").map(t => t.trim().replace(/['"]/g, ""));
+        if (tools.includes(toolName)) return skillName;
+      }
     } catch { /* skip unreadable */ }
   }
   return null;
