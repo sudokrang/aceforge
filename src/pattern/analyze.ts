@@ -50,6 +50,7 @@ const NATIVE_TOOLS = new Set([
   "file_head", "file_write", "file_read",
   "apply_patch", "grep", "glob", "list_directory",
   "tavily_search", "tavily_extract",
+  "gateway",
   ...ACEFORGE_TOOL_BLOCKLIST,
 ]);
 
