@@ -682,11 +682,24 @@ function buildPlugin() {
             // ── Diagnostics ──
             case "quality": {
               if (!subArgs) return { text: "Usage: /forge quality <skill-name>" };
-              const skillFile = path.join(SKILLS_DIR, subArgs, "SKILL.md");
-              if (!fs.existsSync(skillFile)) return { text: `Skill '${subArgs}' not found.` };
-              const skillMd = fs.readFileSync(skillFile, "utf-8");
-              const toolName = subArgs.replace(/-(guard|skill|v\d+|rev\d+|upgrade)$/, "");
-              return { text: formatQualityReport(scoreSkill(skillMd, toolName), subArgs) };
+              let qualityFile = path.join(SKILLS_DIR, subArgs, "SKILL.md");
+              let qualitySource = "deployed";
+              if (!fs.existsSync(qualityFile)) {
+                qualityFile = path.join(PROPOSALS_DIR, subArgs, "SKILL.md");
+                qualitySource = "proposal";
+              }
+              if (!fs.existsSync(qualityFile)) return { text: `Skill '${subArgs}' not found in deployed skills or proposals.` };
+              const skillMd = fs.readFileSync(qualityFile, "utf-8");
+              const toolName = subArgs.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow)$/, "").replace(/-(docker|ssh|nas|git|npm|python|http|config|code|docs|data|logs|openclaw|systemd|k8s|archive|search|brew|apt|netsuite)$/, "");
+              const qReport = scoreSkill(skillMd, toolName);
+              let qText = `[${qualitySource.toUpperCase()}] ` + formatQualityReport(qReport, subArgs);
+              if (qualitySource === "proposal") {
+                const rec = qReport.combined >= 70 ? "\u2705 Recommend: approve"
+                  : qReport.combined >= 50 ? "\u26a0\ufe0f Borderline: review carefully"
+                  : "\u274c Recommend: reject";
+                qText += `\n${rec}`;
+              }
+              return { text: qText };
             }
             case "gaps":
               return { text: buildUnifiedGapReport() };
@@ -744,7 +757,206 @@ function buildPlugin() {
             case "adversarial":
               return { text: formatAdversarialReport() };
 
-            // ── Filtered candidates ──
+            // ── Preview: human-readable skill brief for non-technical users ──
+            case "preview": {
+              if (!subArgs) return { text: "Usage: /forge preview <name>" };
+              let previewFile = path.join(PROPOSALS_DIR, subArgs, "SKILL.md");
+              let previewSource = "PROPOSAL";
+              if (!fs.existsSync(previewFile)) {
+                previewFile = path.join(SKILLS_DIR, subArgs, "SKILL.md");
+                previewSource = "INSTALLED";
+              }
+              if (!fs.existsSync(previewFile)) return { text: `'${subArgs}' not found in proposals or installed skills.` };
+              const md = fs.readFileSync(previewFile, "utf-8");
+
+              // ── Extract "What this skill does" from description ──
+              const descMatch = md.match(/^description:\s*["']?(.+?)["']?$/m);
+              const description = descMatch ? descMatch[1].trim() : "";
+
+              // Build a plain-english summary from the description
+              // Capitalize first letter, ensure it reads as a sentence
+              let whatItDoes = description;
+              if (whatItDoes && !whatItDoes.endsWith(".")) whatItDoes += ".";
+              if (whatItDoes) whatItDoes = whatItDoes.charAt(0).toUpperCase() + whatItDoes.slice(1);
+
+              // ── Extract "What it will improve" from instructions/steps ──
+              // Look for ### headings inside Instructions section, or numbered steps
+              const capabilities: string[] = [];
+              // Strategy 1: Find ### sub-headings (e.g., "### View Current Config")
+              const subHeadings = md.match(/^###\s+(?:\d+\.?\s*)?(.+)$/gm);
+              if (subHeadings) {
+                for (const h of subHeadings.slice(0, 6)) {
+                  const clean = h.replace(/^###\s+(?:\d+\.?\s*)?/, "").trim();
+                  // Skip meta-headings
+                  if (/when to use|pre.?flight|error|anti.?pattern|instructions/i.test(clean)) continue;
+                  if (clean.length > 3 && clean.length < 80) capabilities.push(clean);
+                }
+              }
+              // Strategy 2: If no sub-headings, look for bullet points under Instructions
+              if (capabilities.length === 0) {
+                const instrSection = md.match(/##\s*Instructions[\s\S]*?(?=\n##\s|$)/i);
+                if (instrSection) {
+                  const bullets = instrSection[0].match(/^\s*[-*]\s+(.{10,80})$/gm);
+                  if (bullets) {
+                    for (const b of bullets.slice(0, 5)) {
+                      capabilities.push(b.replace(/^\s*[-*]\s+/, "").replace(/\*\*/g, "").trim());
+                    }
+                  }
+                }
+              }
+
+              // ── Extract "Mistakes it will prevent" from anti-patterns ──
+              const mistakes: string[] = [];
+              const antiSection = md.match(/##\s*Anti[- ]?Patterns[\s\S]*?(?=\n##\s|$)/i);
+              if (antiSection) {
+                const bullets = antiSection[0].match(/^\s*[-*]\s+\*\*(.+?)\*\*/gm);
+                if (bullets) {
+                  for (const b of bullets.slice(0, 5)) {
+                    let clean = b.replace(/^\s*[-*]\s+\*\*/, "").replace(/\*\*.*$/, "").trim();
+                    // Remove leading "Never " or "Do not " for cleaner display
+                    clean = clean.replace(/^[Nn]ever\s+/, "").replace(/^[Dd]o\s+not\s+/, "");
+                    if (clean.length > 3) mistakes.push(clean.charAt(0).toUpperCase() + clean.slice(1));
+                  }
+                }
+              }
+              // Fallback: look for "Never" bullets anywhere
+              if (mistakes.length === 0) {
+                const neverBullets = md.match(/^\s*[-*]\s+\*\*[Nn]ever\*\*\s+(.{5,80})/gm);
+                if (neverBullets) {
+                  for (const b of neverBullets.slice(0, 4)) {
+                    const clean = b.replace(/^\s*[-*]\s+\*\*[Nn]ever\*\*\s+/, "").replace(/\s*[-\u2014].*$/, "").trim();
+                    if (clean.length > 3) mistakes.push(clean.charAt(0).toUpperCase() + clean.slice(1));
+                  }
+                }
+              }
+
+              // ── Extract error recovery topics ──
+              const recoveries: string[] = [];
+              const errorSection = md.match(/##\s*Error\s+Recovery[\s\S]*?(?=\n##\s|$)/i);
+              if (errorSection) {
+                // Look for error names in table rows or bold text
+                const errorNames = errorSection[0].match(/`([^`]{3,40})`/g);
+                if (errorNames) {
+                  for (const e of errorNames.slice(0, 3)) {
+                    recoveries.push(e.replace(/`/g, ""));
+                  }
+                }
+              }
+
+              // ── Trace provenance from candidates.jsonl ──
+              let traceCount = "";
+              let traceSessions = "";
+              let traceSuccess = "";
+              let traceType = "";
+              try {
+                const candFile = path.join(FORGE_DIR, "candidates.jsonl");
+                if (fs.existsSync(candFile)) {
+                  const lines = fs.readFileSync(candFile, "utf-8").trim().split("\n").filter(Boolean);
+                  const toolName = subArgs.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow)$/, "").replace(/-(docker|ssh|nas|git|npm|python|http|config|code|docs|data|logs|openclaw|systemd|k8s|archive|search|brew|apt|netsuite)$/, "");
+                  for (let i = lines.length - 1; i >= 0; i--) {
+                    try {
+                      const c = JSON.parse(lines[i]);
+                      if (c.tool === toolName || c.tool === subArgs || (c.canonicalName && c.canonicalName === subArgs)) {
+                        traceCount = String(c.occurrences || "?");
+                        traceSessions = String(c.distinct_sessions || "?");
+                        traceSuccess = String(Math.round((c.success_rate || 0) * 100));
+                        traceType = c.type || "";
+                        break;
+                      }
+                    } catch { /* skip */ }
+                  }
+                }
+              } catch { /* no candidates file */ }
+
+              // ── Readiness checks ──
+              const hasWhenToUse = /##?\s*when\s+to\s+use/i.test(md);
+              const hasInstructions = /##?\s*(instructions|steps|how\s+to|usage|workflow)/i.test(md);
+              const hasErrorRecovery = /##?\s*(error\s+recovery|troubleshoot|when\s+.+\s+fails)/i.test(md);
+              const hasAntiPatterns = /##?\s*anti[- ]?patterns/i.test(md);
+              const sectionCount = [hasWhenToUse, hasInstructions, hasErrorRecovery, hasAntiPatterns].filter(Boolean).length;
+
+              const structureOk = sectionCount >= 3;
+              const evidenceStrong = parseInt(traceCount) >= 10 && parseInt(traceSessions) >= 2;
+              const evidenceModerate = parseInt(traceCount) >= 5;
+
+              // ── For deployed skills: show activation data instead ──
+              let activationInfo = "";
+              if (previewSource === "INSTALLED") {
+                try {
+                  const stats = getSkillStats(subArgs);
+                  if (stats && stats.activations > 0) {
+                    activationInfo = `\n  \u2500\u2500 Performance since install \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                    activationInfo += `  ${stats.activations} activations, ${Math.round(stats.successRate * 100)}% success rate\n`;
+                    if (stats.activations >= 20) {
+                      activationInfo += `  \u2705 Proven \u2014 enough data to measure real effectiveness\n`;
+                    } else {
+                      activationInfo += `  \u26a0\ufe0f Still early \u2014 need ${20 - stats.activations} more activations for reliable data\n`;
+                    }
+                  }
+                } catch { /* lifecycle not available */ }
+              }
+
+              // ── Build the output ──
+              let t = `${subArgs} [${previewSource}]\n\n`;
+
+              // What this skill does
+              if (whatItDoes) {
+                t += `  \u2500\u2500 What this skill does \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                t += `  ${whatItDoes}\n`;
+              }
+
+              // What it will improve
+              if (capabilities.length > 0) {
+                t += `\n  \u2500\u2500 What your agent will learn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                for (const cap of capabilities.slice(0, 5)) t += `  \u2713 ${cap}\n`;
+              }
+
+              // Mistakes it will prevent
+              if (mistakes.length > 0) {
+                t += `\n  \u2500\u2500 Mistakes it will prevent \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                for (const m of mistakes.slice(0, 4)) t += `  \u2717 ${m}\n`;
+              }
+
+              // Error recovery
+              if (recoveries.length > 0) {
+                t += `\n  \u2500\u2500 Errors it knows how to handle \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                for (const r of recoveries) t += `  \u21bb ${r}\n`;
+              }
+
+              // Why AceForge suggested this
+              if (traceCount) {
+                t += `\n  \u2500\u2500 Why this was suggested \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                t += `  Your agent ran these commands ${traceCount} times across\n`;
+                t += `  ${traceSessions} session(s) with ${traceSuccess}% success.\n`;
+                if (traceType === "native-subpattern") {
+                  t += `  This was the most common pattern for this tool.\n`;
+                } else if (traceType === "evolution") {
+                  t += `  This is an update to an existing skill based on new usage.\n`;
+                } else if (traceType === "remediation") {
+                  t += `  This addresses a gap where your agent struggled.\n`;
+                }
+              }
+
+              // Activation data for deployed skills
+              if (activationInfo) t += activationInfo;
+
+              // Readiness
+              t += `\n  \u2500\u2500 Is it ready? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+              t += `  ${structureOk ? "\u2705" : "\u26a0\ufe0f"} ${structureOk ? "Well structured" : "Missing some sections"} \u2014 ${sectionCount}/4 recommended sections\n`;
+              t += `  ${evidenceStrong ? "\u2705 Strong evidence" : evidenceModerate ? "\u26a0\ufe0f Some evidence" : "\u26a0\ufe0f Limited evidence"} \u2014 based on ${traceCount || "?"} real interactions\n`;
+              if (previewSource === "PROPOSAL") {
+                t += `  \u2139\ufe0f Effectiveness unknown until installed\n`;
+              }
+
+              // Actions
+              t += `\n  /forge approve ${subArgs}  \u2502  /forge reject ${subArgs}`;
+              if (previewSource === "PROPOSAL") {
+                t += `\n  /forge quality ${subArgs}  \u2502  Full structural breakdown`;
+              }
+              return { text: t };
+            }
+
+                        // ── Filtered candidates ──
             case "filtered": {
               const filteredFile = path.join(FORGE_DIR, "filtered-candidates.jsonl");
               if (!fs.existsSync(filteredFile)) return { text: "No filtered candidates yet." };
@@ -797,7 +1009,8 @@ function buildPlugin() {
                 "  /forge quality <n>    — Score a skill against usage data",
                 "  /forge gaps           — All capability gaps",
                 "  /forge watchdog       — Effectiveness check",
-                "  /forge filtered      — What quality gates suppressed",
+                "  /forge filtered      \u2014 What quality gates suppressed",
+                "  /forge preview <n>   \u2014 Preview a skill before approving",
                 "",
                 "Intelligence:",
                 "  /forge tree           — Capability tree with gap scores",
