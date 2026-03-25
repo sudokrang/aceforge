@@ -99,8 +99,17 @@ function extractArgTokens(argsSummary: string): string[] {
     .slice(0, 10);
 }
 
-// Canonical blocklist — imported from constants.ts (no local copy)
-import { ACEFORGE_TOOL_BLOCKLIST as TOOL_BLOCKLIST } from "../pattern/constants.js";
+const TOOL_BLOCKLIST = new Set([
+  "forge", "forge_status", "forge_reflect", "forge_propose",
+  "forge_approve_skill", "forge_reject_skill", "forge_quality",
+  "forge_approve", "forge_reject", "forge_retire", "forge_reinstate",
+  "forge_registry", "forge_rewards", "forge_gaps",
+  "forge_retire_skill", "forge_tree", "forge_cross_session", "forge_compose",
+  "forge_behavior_gaps", "forge_optimize",
+  "forge_test", "forge_challenge", "forge_adversarial",
+  "sessions_spawn", "sessions_list", "sessions_send", "sessions_history",
+  "process", "message", "notify",
+]);
 
 export function mergePatterns(): CrossSessionState {
   const state = loadState();

@@ -232,9 +232,18 @@ function buildPlugin() {
           expireOldProposals(notify);
 
           // F3 fix: revalidate proposals against current native tool list
-          // NATIVE_TOOLS imported from src/pattern/constants.ts — canonical source
+          const STARTUP_NATIVE_TOOLS = new Set([
+            "exec", "write", "edit", "delete", "move", "copy",
+            "read", "pdf", "image", "browser", "web_fetch", "web_search",
+            "session_send", "sessions_send", "broadcast",
+            "message", "notify", "process", "exec-ssh",
+            "memory_search", "memory_recall", "memory_store",
+            "file_head", "file_write", "file_read",
+            "apply_patch", "grep", "glob", "list_directory",
+            "tavily_search", "tavily_extract",
+          ]);
           try {
-            const removed = revalidateProposals(NATIVE_TOOLS, notify);
+            const removed = revalidateProposals(STARTUP_NATIVE_TOOLS, notify);
             if (removed.length > 0) {
               tests.push(`🧹 Revalidation: removed ${removed.length} stale proposal(s): ${removed.join(", ")}`);
             }

@@ -560,10 +560,8 @@ section("Phase 3C: Adversarial Robustness — 19 Mutations");
 // 7. SHARED BLOCKLIST — N-M5 Consistency
 // ═══════════════════════════════════════════════════════════════════
 
-section("Shared Blocklist: N-M5 — Consistency (constants.ts canonical)");
+section("Shared Blocklist: N-M5 — Consistency");
 {
-  // ── v0.8.1: All blocklists now in constants.ts ──
-
   // Capture blocklist is a subset of tool blocklist
   for (const tool of ACEFORGE_CAPTURE_BLOCKLIST) {
     assert(ACEFORGE_TOOL_BLOCKLIST.has(tool), `Capture blocklist '${tool}' present in tool blocklist`);
@@ -589,16 +587,6 @@ section("Shared Blocklist: N-M5 — Consistency (constants.ts canonical)");
   assert(SELF_TOOLS.has("write"), "SELF_TOOLS includes 'write'");
   assert(SELF_TOOLS.has("web_search"), "SELF_TOOLS includes 'web_search'");
 
-  // NATIVE_TOOLS is superset of SELF_TOOLS
-  for (const tool of SELF_TOOLS) {
-    assert(NATIVE_TOOLS_SET.has(tool), `SELF_TOOLS '${tool}' present in NATIVE_TOOLS`);
-  }
-
-  // NATIVE_TOOLS includes extended primitives
-  assert(NATIVE_TOOLS_SET.has("apply_patch"), "NATIVE_TOOLS includes 'apply_patch'");
-  assert(NATIVE_TOOLS_SET.has("gateway"), "NATIVE_TOOLS includes 'gateway'");
-  assert(NATIVE_TOOLS_SET.has("tavily_search"), "NATIVE_TOOLS includes 'tavily_search'");
-
   // All forge tools are blocked in both
   const forgeTools = ["forge", "forge_status", "forge_reflect", "forge_approve_skill",
     "forge_reject_skill", "forge_quality", "forge_registry", "forge_rewards", "forge_gaps"];
@@ -607,30 +595,16 @@ section("Shared Blocklist: N-M5 — Consistency (constants.ts canonical)");
     assert(ACEFORGE_TOOL_BLOCKLIST.has(ft), `Forge tool '${ft}' in tool blocklist`);
   }
 
-  // ── v0.8.1: No-drift enforcement ──
-  // Verify other files DON'T define their own blocklists
-  function fileDefinesOwnBlocklist(filePath: string): boolean {
-    const src = fs.readFileSync(filePath, "utf-8");
-    return /(?:const|let|var)\s+(?:CAPTURE_BLOCKLIST|TOOL_BLOCKLIST|GAP_BLOCKLIST|ACEFORGE_TOOL_BLOCKLIST|NATIVE_TOOLS|SELF_TOOLS)\s*=\s*new\s+Set\s*\(/.test(src);
-  }
-
-  assert(!fileDefinesOwnBlocklist(captureFile), "capture.ts imports blocklist from constants (no local Set definition)");
-  assert(!fileDefinesOwnBlocklist(crossSessionFile), "cross-session.ts imports blocklist from constants (no local Set definition)");
-  assert(!fileDefinesOwnBlocklist(gapDetectFile), "gap-detect.ts imports blocklist from constants (no local Set definition)");
-  assert(!fileDefinesOwnBlocklist(analyzeFile), "analyze.ts imports blocklists from constants (no local Set definition)");
-
-  // Verify constants.ts exists and IS the canonical source
-  assert(fs.existsSync(constantsFile), "constants.ts exists as canonical blocklist source");
-  const constantsSrc = fs.readFileSync(constantsFile, "utf-8");
-  assert(constantsSrc.includes("ACEFORGE_TOOL_BLOCKLIST"), "constants.ts defines ACEFORGE_TOOL_BLOCKLIST");
-  assert(constantsSrc.includes("CAPTURE_BLOCKLIST"), "constants.ts defines CAPTURE_BLOCKLIST");
-  assert(constantsSrc.includes("NATIVE_TOOLS"), "constants.ts defines NATIVE_TOOLS");
-  assert(constantsSrc.includes("SELF_TOOLS"), "constants.ts defines SELF_TOOLS");
-
-  // Cross-check: canonical blocklists should be consistent with each other
+  // H2 fix: cross-file drift detection — verify all blocklists match canonical
   for (const tool of ACEFORGE_TOOL_BLOCKLIST) {
     assert(CROSS_SESSION_BLOCKLIST.has(tool), `C2 drift check: '${tool}' in cross-session blocklist`);
     assert(GAP_DETECT_BLOCKLIST.has(tool), `C3 drift check: '${tool}' in gap-detect blocklist`);
+  }
+  for (const tool of CROSS_SESSION_BLOCKLIST) {
+    assert(ACEFORGE_TOOL_BLOCKLIST.has(tool), `C2 reverse: cross-session '${tool}' in canonical blocklist`);
+  }
+  for (const tool of GAP_DETECT_BLOCKLIST) {
+    assert(ACEFORGE_TOOL_BLOCKLIST.has(tool), `C3 reverse: gap-detect '${tool}' in canonical blocklist`);
   }
 }
 

@@ -42,6 +42,7 @@ import { checkVikingHealth } from "./src/viking/client.js";
 import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";
 import { detectGaps } from "./src/pattern/gap-detect.js";
 import { NATIVE_TOOLS } from "./src/pattern/constants.js";
+import { NATIVE_TOOLS } from "./src/pattern/constants.js";
 
 // ─── Phase 2 imports ────────────────────────────────────────────────────
 import { buildCapabilityTree, formatCapabilityTree, getPriorityDomains } from "./src/intelligence/capability-tree.js";
