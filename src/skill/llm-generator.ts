@@ -25,6 +25,7 @@ const FORGE_DIR = path.join(
 // ─── G2: Rate limiter ───────────────────────────────────────────
 const MIN_INTERVAL_MS = 2000;
 const MAX_CALLS_PER_CYCLE = 8;
+const LLM_TIMEOUT_MS = 30_000; // 30s — prevents pipeline stall on hung API
 let lastLlmCallMs = 0;
 let callsThisCycle = 0;
 
@@ -41,8 +42,15 @@ async function rateLimitedFetch(url: string, init: RequestInit): Promise<Respons
   const wait = Math.max(0, MIN_INTERVAL_MS - (now - lastLlmCallMs));
   if (wait > 0) await new Promise(r => setTimeout(r, wait));
   lastLlmCallMs = Date.now();
-  callsThisCycle++;
-  return fetch(url, init);
+
+  // Bug #3: Add timeout to prevent pipeline stall on hung API
+  // Bug #8: Only count successful dispatches against rate limit
+  const res = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+  });
+  callsThisCycle++; // count AFTER successful dispatch, not before
+  return res;
 }
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -317,7 +325,13 @@ async function callGenerator(url: string, apiKey: string, model: string, brief: 
     const errText = await res.text().catch(() => "");
     throw new Error(`Generator API ${res.status}: ${errText.slice(0, 200)}`);
   }
-  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  let data: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    const preview = await res.text().catch(() => "(unreadable)");
+    throw new Error(`Generator returned malformed JSON: ${preview.slice(0, 100)}`);
+  }
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("Generator returned empty response");
   return content;
@@ -337,7 +351,13 @@ async function callReviewer(url: string, apiKey: string, model: string, reviewPr
     const errText = await res.text().catch(() => "");
     throw new Error(`Reviewer API ${res.status}: ${errText.slice(0, 200)}`);
   }
-  const data = await res.json() as { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> };
+  let data: { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> };
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    const preview = await res.text().catch(() => "(unreadable)");
+    throw new Error(`Reviewer returned malformed JSON: ${preview.slice(0, 100)}`);
+  }
   const msg = data.choices?.[0]?.message;
   if (!msg?.content) throw new Error("Reviewer returned empty response");
   if (msg.reasoning_content) {

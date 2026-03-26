@@ -44,12 +44,22 @@ function rotateFile(fileName: string): void {
 
   // Audit fix: use lockfile to prevent concurrent rotation
   const lockFile = path.join(FORGE_DIR, `.${fileName}.lock`);
+
+  // Bug #6: Detect stale lockfiles from crashed processes (60s expiry)
+  try {
+    const lockStat = fsSync.statSync(lockFile);
+    if (Date.now() - lockStat.mtimeMs > 60_000) {
+      console.warn(`[aceforge] removing stale lockfile: ${lockFile} (age: ${Math.round((Date.now() - lockStat.mtimeMs) / 1000)}s)`);
+      fsSync.unlinkSync(lockFile);
+    }
+  } catch { /* lockfile doesn't exist — expected path */ }
+
   try {
     // O_EXCL fails if file exists — atomic check-and-create
     const fd = fsSync.openSync(lockFile, fsSync.constants.O_CREAT | fsSync.constants.O_EXCL | fsSync.constants.O_WRONLY);
     fsSync.closeSync(fd);
   } catch {
-    // Lock file exists — another rotation in progress
+    // Lock file exists and is fresh — another rotation in progress
     return;
   }
 

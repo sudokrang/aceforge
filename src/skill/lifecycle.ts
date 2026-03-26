@@ -392,7 +392,7 @@ export function checkEffectivenessVsBaseline(skillName: string): { improved: boo
   if (activations.length < 50) return null;
 
   const successes = activations.filter(e => e.success).length;
-  const currentRate = successes / activations.length;
+  const currentRate = activations.length > 0 ? successes / activations.length : 0;
   const baselineRate = baseline.baselineSuccessRate || 0;
   const delta = currentRate - baselineRate;
 
@@ -445,11 +445,14 @@ export function runEffectivenessWatchdog(): WatchdogAlert[] {
     if (entries.length < 50) continue;
 
     const successes = entries.filter(e => e.success).length;
-    const currentRate = successes / entries.length;
+    const currentRate = entries.length > 0 ? successes / entries.length : 0;
 
     const allEntries = getHealthEntries(skill);
     const baseline = allEntries.find(e => e.action === "deployment_baseline");
     const baselineRate = baseline?.baselineSuccessRate || 0;
+
+    // Bug #9: guard against NaN propagation
+    if (isNaN(currentRate)) continue;
 
     // Alert if no improvement over baseline after 50 activations
     if (baselineRate > 0 && currentRate <= baselineRate) {

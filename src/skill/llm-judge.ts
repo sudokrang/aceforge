@@ -17,6 +17,7 @@ const HOME = os.homedir() || process.env.HOME || "";
 // ─── G5: Rate limiter (same as llm-generator.ts — prevents judge API spam) ──
 const JUDGE_MIN_INTERVAL_MS = 2000;
 const JUDGE_MAX_CALLS_PER_CYCLE = 8;
+const JUDGE_TIMEOUT_MS = 30_000; // 30s timeout
 let _judgeLastCallMs = 0;
 let _judgeCallsThisCycle = 0;
 
@@ -31,8 +32,14 @@ async function rateLimitedFetch(url: string, init: RequestInit): Promise<Respons
   const wait = Math.max(0, JUDGE_MIN_INTERVAL_MS - (now - _judgeLastCallMs));
   if (wait > 0) await new Promise(r => setTimeout(r, wait));
   _judgeLastCallMs = Date.now();
+
+  // Bug #3: timeout prevents pipeline stall; Bug #8: count after dispatch
+  const res = await fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS),
+  });
   _judgeCallsThisCycle++;
-  return fetch(url, init);
+  return res;
 }
 
 // Config imported from llm-generator
