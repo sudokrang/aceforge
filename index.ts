@@ -122,7 +122,7 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
       }
       notify(`Deploying ${skillName} with warnings: ${result.errors.join("; ")}`);
     }
-  } catch { /* validator import failed — deploy anyway */ }
+  } catch (err) { fs.rmSync(path.join(SKILLS_DIR, skillName), { recursive: true, force: true }); return { ok: false, message: `Skill '${skillName}' rejected: validator failed to load — ${(err as Error).message}` }; }
 
   recordActivation(skillName, true);
   const toolMatch = skillName.match(/^(.+?)(?:-guard|-skill|-v\d+|-rev\d+)?$/);
@@ -655,7 +655,7 @@ function buildPlugin() {
                     return { text: `Upgrade '${upgradeName}' blocked by validator: ${blockReasons}` };
                   }
                 }
-              } catch { /* validator import failed — proceed with caution */ }
+              } catch (err) { return { text: `Upgrade aborted: validator failed to load — ${(err as Error).message}` }; }
 
               if (fs.existsSync(path.join(SKILLS_DIR, oldName))) { retireSkill(oldName); }
               const targetDir = path.join(SKILLS_DIR, oldName);
@@ -684,7 +684,7 @@ function buildPlugin() {
                   if (valResult.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
                     return { text: `Rollback aborted: retired version of '${subArgs}' fails security validation. Both versions preserved.` };
                   }
-                } catch { /* validator import failed — proceed */ }
+                } catch (err) { return { text: `Rollback aborted: validator failed to load — ${(err as Error).message}` }; }
               }
 
               if (fs.existsSync(path.join(SKILLS_DIR, subArgs))) fs.rmSync(path.join(SKILLS_DIR, subArgs), { recursive: true, force: true });

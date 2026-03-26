@@ -2,7 +2,7 @@
   "id": "aceforge",
   "name": "AceForge",
   "description": "Self-evolving skill engine \u2014 detects patterns, crystallizes skills, manages lifecycle, proactive intelligence, self-validation",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "openclaw": {
     "extensions": [
       "./index.ts"
