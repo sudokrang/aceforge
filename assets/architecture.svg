@@ -55,7 +55,7 @@
 
 <!-- Version pill -->
 <rect x="580" y="74" width="120" height="20" rx="10" fill="none" stroke="#30363d" stroke-width="0.8"/>
-<text x="640" y="88" text-anchor="middle" font-family="'SF Mono',monospace" font-size="9" fill="#8b949e">v0.8.0 · MIT</text>
+<text x="640" y="88" text-anchor="middle" font-family="'SF Mono',monospace" font-size="9" fill="#8b949e">v0.8.2 · MIT</text>
 
 <!-- ═══════════════════════════════════════════════════ -->
 <!-- MAIN PIPELINE — horizontal flow                     -->
@@ -363,6 +363,6 @@
 <path d="M1050 300 L1050 370" fill="none" stroke="#F09595" stroke-width="0.8" opacity="0.2"/>
 
 <!-- Footer -->
-<text x="640" y="860" text-anchor="middle" font-family="'SF Mono',monospace" font-size="9" fill="#30363d">AceForge v0.8.0 · github.com/sudokrang/aceforge · MIT License</text>
+<text x="640" y="860" text-anchor="middle" font-family="'SF Mono',monospace" font-size="9" fill="#30363d">AceForge v0.8.2 · github.com/sudokrang/aceforge · MIT License</text>
 
 </svg>

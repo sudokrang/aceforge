@@ -1,5 +1,5 @@
 /**
- * AceForge v0.8.0 Test Suite
+ * AceForge v0.8.2 Test Suite
  *
  * Full coverage: Phase 1 (validator, quality, similarity, lifecycle),
  * Phase 2 (capability tree, cross-session, composition, gaps, optimizer, auto-adjust),
@@ -978,7 +978,7 @@ Use this bot: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz_12345678
 // ═══════════════════════════════════════════════════════════════════
 
 console.log(`\n${"═".repeat(60)}`);
-console.log(`AceForge v0.8.0 Test Results: ${passed} passed, ${failed} failed`);
+console.log(`AceForge v0.8.2 Test Results: ${passed} passed, ${failed} failed`);
 if (failures.length > 0) {
   console.log(`\nFailures:`);
   for (const f of failures) console.log(`  ❌ ${f}`);

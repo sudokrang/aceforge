@@ -6,7 +6,7 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://openclaw.ai"><img src="https://img.shields.io/badge/OpenClaw-Plugin-orange" alt="OpenClaw Plugin"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.8.1-green" alt="Version"></a>
+  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.8.2-green" alt="Version"></a>
   <img src="https://img.shields.io/badge/tests-363%2F363-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/adversarial-23%2F23-brightgreen" alt="Adversarial">
 </p>
@@ -379,7 +379,7 @@ openclaw plugins list | grep aceforge
 Expected:
 
 ```
-[aceforge] v0.8.1 — all hooks, tools, and commands registered
+[aceforge] v0.8.2 — all hooks, tools, and commands registered
 ```
 
 ---
