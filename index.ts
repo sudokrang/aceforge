@@ -46,9 +46,9 @@ import { NATIVE_TOOLS } from "./src/pattern/constants.js";
 // ─── Phase 2 imports ────────────────────────────────────────────────────
 import { buildCapabilityTree, formatCapabilityTree, getPriorityDomains } from "./src/intelligence/capability-tree.js";
 import { mergePatterns, formatCrossSessionReport, getCrossSessionCandidates } from "./src/intelligence/cross-session.js";
-import { detectCoActivations, formatCompositionReport, getCompositionCandidates } from "./src/intelligence/composition.js";
+import { formatCompositionReport } from "./src/intelligence/composition.js";
 import { summarizeBehaviorGaps, formatBehaviorGapReport, updateTreeWithBehaviorGaps } from "./src/intelligence/proactive-gaps.js";
-import { detectDescriptionMismatches, formatOptimizationReport } from "./src/intelligence/description-optimizer.js";
+import { formatOptimizationReport } from "./src/intelligence/description-optimizer.js";
 import { handleCorrectionForSkill } from "./src/intelligence/auto-adjust.js";
 
 // ─── Phase 3 imports ────────────────────────────────────────────────────
@@ -773,7 +773,7 @@ function buildPlugin() {
             case "cross_session":
               return { text: formatCrossSessionReport() };
             case "compose":
-              return { text: formatCompositionReport() };
+              return { text: "⚠️ Experimental: Composition detection identifies co-activation candidates.\nDAG orchestration is not yet implemented.\n\n" + formatCompositionReport() };
             case "behavior_gaps":
               return { text: formatBehaviorGapReport() };
             case "optimize":
@@ -912,20 +912,6 @@ function buildPlugin() {
                 }
               } catch { /* no candidates file */ }
 
-              // ── Maturity stage ──
-              if (previewSource === "INSTALLED") {
-                const maturity = getSkillMaturity(subArgs);
-                const mIcon = maturity === "mature" ? "\u2705 Mature" : maturity === "committed" ? "\u2139\ufe0f Committed" : "\u26a0\ufe0f Progenitor";
-                t += `\n  \u2500\u2500 Maturity \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
-                t += `  ${mIcon}\n`;
-                if (maturity === "committed") {
-                  const mStats = getSkillStats(subArgs);
-                  const needed = 50 - mStats.activations;
-                  if (needed > 0) t += `  ${needed} more activations + 75% success + 14d to reach mature\n`;
-                  else t += `  Checking success rate and deployment age for promotion...\n`;
-                }
-              }
-
               // ── Readiness checks ──
               const hasWhenToUse = /##?\s*when\s+to\s+use/i.test(md);
               const hasInstructions = /##?\s*(instructions|steps|how\s+to|usage|workflow)/i.test(md);
@@ -956,6 +942,20 @@ function buildPlugin() {
 
               // ── Build the output ──
               let t = `${subArgs} [${previewSource}]\n\n`;
+
+              // ── Maturity stage ──
+              if (previewSource === "INSTALLED") {
+                const maturity = getSkillMaturity(subArgs);
+                const mIcon = maturity === "mature" ? "\u2705 Mature" : maturity === "committed" ? "\u2139\ufe0f Committed" : "\u26a0\ufe0f Progenitor";
+                t += `\n  \u2500\u2500 Maturity \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n`;
+                t += `  ${mIcon}\n`;
+                if (maturity === "committed") {
+                  const mStats = getSkillStats(subArgs);
+                  const needed = 50 - mStats.activations;
+                  if (needed > 0) t += `  ${needed} more activations + 75% success + 14d to reach mature\n`;
+                  else t += `  Checking success rate and deployment age for promotion...\n`;
+                }
+              }
 
               // What this skill does
               if (whatItDoes) {

@@ -11,7 +11,6 @@
 import * as fsSync from "fs";
 import * as path from "path";
 import * as os from "os";
-import { appendJsonl } from "../pattern/store.js";
 import { extractDomainPrefix } from "../pattern/analyze.js";
 
 const HOME = os.homedir() || process.env.HOME || "";

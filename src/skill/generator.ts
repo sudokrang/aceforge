@@ -89,6 +89,15 @@ export function generateSkillFromCandidate(candidate: Candidate): { skillName: s
 
 export function writeProposal(skillName: string, skillMd: string): string {
   const proposalDir = path.join(FORGE_DIR, "proposals", skillName);
+
+  // Dry-run mode: log what would be proposed without writing to disk
+  if (process.env.ACEFORGE_DRY_RUN === "true" || process.env.ACEFORGE_DRY_RUN === "1") {
+    const descMatch = skillMd.match(/^description:\s*["']?(.+?)["']?$/m);
+    const summary = descMatch ? descMatch[1].slice(0, 120) : "No description";
+    console.log(`[aceforge/dry-run] Would propose: ${skillName} — ${summary}`);
+    return proposalDir;
+  }
+
   fsSync.mkdirSync(proposalDir, { recursive: true });
 
   // Guarantee aceforge metadata exists on every proposal (LLM output may omit it)

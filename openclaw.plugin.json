@@ -31,6 +31,11 @@
         "type": "string",
         "default": "auto",
         "description": "Notification channel: telegram, slack, log, or auto (auto-detect)"
+      },
+      "dryRun": {
+        "type": "boolean",
+        "default": false,
+        "description": "Observation-only mode: log what would be proposed without writing skills to disk"
       }
     }
   }

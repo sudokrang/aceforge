@@ -62,6 +62,8 @@ AceForge is the **skill generation and lifecycle layer** for OpenClaw agents. It
 - **Not ClawHub-hostile.** If a ClawHub skill serves your agent well, AceForge leaves it alone. It only proposes upgrades when trace data shows the skill is underperforming.
 - **Not a fine-tuning system.** Skills are externalized artifacts — inspectable, editable, shareable, version-controlled. Not model weights.
 
+> **Observation-only mode:** Set `ACEFORGE_DRY_RUN=true` to log what skills would be proposed without writing anything to disk. Perfect for evaluating AceForge before committing.
+
 > **Bounded exception:** Correction-driven micro-revisions (anti-pattern appends, instruction notes) self-apply without approval. Full rewrites always require approval.
 
 ---
@@ -414,6 +416,7 @@ AceForge is fully compatible with [OpenViking](https://github.com/sudokrang/open
 | `ACEFORGE_OWNER_CHAT_ID` | from openclaw.json | Telegram chat ID |
 | `ACEFORGE_SLACK_WEBHOOK_URL` | — | Slack incoming webhook |
 | `ACEFORGE_VIKING_URL` | `http://127.0.0.1:1933` | OpenViking URL (optional) |
+| `ACEFORGE_DRY_RUN` | `false` | Observation-only mode — log proposals without writing to disk |
 
 </details>
 
@@ -573,6 +576,8 @@ Every major design decision in AceForge is grounded in peer-reviewed research. T
 - [OpenClaw](https://openclaw.ai) 2026.3.22 or later
 - Node.js 22+
 - At least one OpenAI-compatible LLM API key
+
+Traces auto-rotate at 10K lines or 30 days (whichever comes first) with gzip archival. No manual cleanup needed.
 
 ---
 
