@@ -6,3 +6,5 @@ dist/
 !jest.config.js
 .env
 .DS_Store
+*.py
+*.sh
