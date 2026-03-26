@@ -62,6 +62,8 @@ AceForge is the **skill generation and lifecycle layer** for OpenClaw agents. It
 - **Not ClawHub-hostile.** If a ClawHub skill serves your agent well, AceForge leaves it alone. It only proposes upgrades when trace data shows the skill is underperforming.
 - **Not a fine-tuning system.** Skills are externalized artifacts — inspectable, editable, shareable, version-controlled. Not model weights.
 
+> **Bounded exception:** Correction-driven micro-revisions (anti-pattern appends, instruction notes) self-apply without approval. Full rewrites always require approval.
+
 ---
 
 ## How It Works
