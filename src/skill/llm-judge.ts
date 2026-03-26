@@ -45,7 +45,7 @@ async function rateLimitedFetch(url: string, init: RequestInit): Promise<Respons
 // Config imported from llm-generator
 
 const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
-  deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-reasoner" },
+  deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-chat" },
   openai:     { url: "https://api.openai.com/v1",    model: "gpt-4o" },
   minimax:    { url: "https://api.minimax.io/v1",    model: "MiniMax-M2.7" },
   openrouter: { url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },

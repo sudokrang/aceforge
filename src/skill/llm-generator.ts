@@ -88,7 +88,7 @@ interface GenerationResult {
 
 const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
   minimax:    { url: "https://api.minimax.io/v1",    model: "MiniMax-M2.7" },
-  deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-reasoner" },
+  deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-chat" },
   openai:     { url: "https://api.openai.com/v1",    model: "gpt-4o" },
   openrouter: { url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },
 };
