@@ -166,6 +166,7 @@ Skills progress through maturity stages based on real-world performance:
 
 - **Proposed** → **Deployed** → **Committed** (50+ activations, 75%+ success, 14+ days) → **Mature**
 - **Apoptosis detection** flags skills with sustained low activation or degraded success rates
+- **Version history** — every deploy, upgrade, micro-revision, rollback, retire, and reinstate is recorded with full SKILL.md content. `/forge history` shows the timeline; `/forge diff` shows what changed between versions. Zero dependencies — LCS-based diff engine built in.
 - **Effectiveness watchdog** runs A/B comparisons when upgrades are deployed
 
 **Design intent:** [Memento-Skills (arXiv:2603.18743)](https://arxiv.org/abs/2603.18743) write phase — the agent updates and expands its skill library based on new experience. Micro-revisions are the fast path; full rewrites are the deliberate path.
@@ -340,6 +341,13 @@ AceForge uses a single `/forge` command with subcommands:
 | `/forge behavior_gaps` | Fallback / deferral / uncertainty detection |
 | `/forge optimize` | Description-language mismatch report |
 
+### History
+
+| Command | Description |
+|---|---|
+| `/forge history <n>` | Version history timeline |
+| `/forge diff <n> [v]` | Unified diff between versions |
+
 ### Validation
 
 | Command | Description |
@@ -481,6 +489,7 @@ export ACEFORGE_REVIEWER_API_KEY=not-needed
     │   ├── llm-judge.ts        # LLM-as-judge for ambiguous quality scores (40-70)
     │   ├── quality-score.ts    # Deterministic structural + coverage scoring
     │   ├── validator.ts        # Security gate — 23 attack patterns + similarity + SOUL.md
+    │   ├── history.ts          # Version history — recordRevision, LCS diff, timeline
     │   ├── lifecycle.ts        # Activation tracking, health cache, A/B, watchdog, baselines
     │   └── index.ts            # Skill index — metadata-only context injection (3K token budget)
     ├── intelligence/
