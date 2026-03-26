@@ -291,7 +291,7 @@ Every generated skill passes through the security validator before you ever see 
 - **Telegram bot token detection** — flags bot tokens embedded in skill instructions
 - **Path traversal prevention** — resolves paths against workspace boundary, including backtick-wrapped paths
 - **SOUL.md/MEMORY.md/IDENTITY.md write detection** — the primary ClawHavoc attack vector
-- **Duplicate blocking** — Jaccard+bigram hybrid similarity blocks 95%+ overlap
+- **Skill conflict detection** — Jaccard+bigram hybrid similarity blocks 95%+ description overlap, warns at 80%+. Proposal dedup checks name prefix, bundledTools, and existing proposals for the same tool
 - **ClawHub dedup** — checks if a skill already exists on ClawHub before proposing
 - **Network domain allowlist** — warns on unrecognized domains
 - **LLM output size limit** — generated skills capped at 50KB

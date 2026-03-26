@@ -19,6 +19,7 @@ import * as fsSync from "fs";
 import * as path from "path";
 import { invalidateHealthCache } from "../skill/lifecycle.js";
 import { notify } from "../notify.js";
+import { recordRevision } from "../skill/history.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
 const SKILLS_DIR = path.join(HOME, ".openclaw", "workspace", "skills");
@@ -77,6 +78,11 @@ export function applyMicroRevision(
 
     // N-M2 fix: invalidate health cache after modifying skill
     invalidateHealthCache(skillName);
+
+    // Record in version history
+    try {
+      recordRevision(skillName, lines.join("\n"), "micro-revision", revision.content.slice(0, 200));
+    } catch { /* non-critical */ }
 
     // Log the adjustment
     const entry: MicroRevision = { ...revision, ts: new Date().toISOString() };

@@ -50,6 +50,7 @@ import { formatCompositionReport } from "./src/intelligence/composition.js";
 import { summarizeBehaviorGaps, formatBehaviorGapReport, updateTreeWithBehaviorGaps } from "./src/intelligence/proactive-gaps.js";
 import { formatOptimizationReport } from "./src/intelligence/description-optimizer.js";
 import { handleCorrectionForSkill } from "./src/intelligence/auto-adjust.js";
+import { recordRevision, formatHistoryTimeline, formatDiff as formatSkillDiff } from "./src/skill/history.js";
 
 // ─── Phase 3 imports ────────────────────────────────────────────────────
 import { runAllHealthTests, formatHealthTestReport } from "./src/validation/health-test.js";
@@ -130,6 +131,12 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
 
   // Rebuild capability tree after deployment
   try { buildCapabilityTree(); } catch { /* non-critical */ }
+
+  // Record in version history
+  try {
+    const deployedMd = fs.readFileSync(path.join(SKILLS_DIR, skillName, "SKILL.md"), "utf-8");
+    recordRevision(skillName, deployedMd, "deploy", "Deployed via /forge approve");
+  } catch { /* non-critical */ }
 
   notify(`Skill deployed: ${skillName}`);
   return { ok: true, message: `Skill '${skillName}' deployed. Active now.` };
@@ -667,6 +674,10 @@ function buildPlugin() {
               if (toolMatch) recordDeploymentBaseline(oldName, toolMatch[1]);
               notify(`Skill upgraded: ${oldName}`);
               try { buildCapabilityTree(); } catch {}
+              try {
+                const upgradedMd = fs.readFileSync(path.join(SKILLS_DIR, oldName, "SKILL.md"), "utf-8");
+                recordRevision(oldName, upgradedMd, "upgrade", `Upgraded from ${upgradeName}`);
+              } catch { /* non-critical */ }
               return { text: `Skill '${oldName}' upgraded.` };
             }
             case "rollback": {
@@ -690,6 +701,10 @@ function buildPlugin() {
               if (fs.existsSync(path.join(SKILLS_DIR, subArgs))) fs.rmSync(path.join(SKILLS_DIR, subArgs), { recursive: true, force: true });
               const done = reinstateSkill(subArgs);
               if (!done) return { text: `Rollback failed for '${subArgs}'.` };
+              try {
+                const rolledMd = fs.readFileSync(path.join(SKILLS_DIR, subArgs, "SKILL.md"), "utf-8");
+                recordRevision(subArgs, rolledMd, "rollback", "Rolled back via /forge rollback");
+              } catch { /* non-critical */ }
               notify(`Skill rolled back: ${subArgs}`);
               return { text: `Skill '${subArgs}' rolled back.` };
             }
@@ -778,6 +793,22 @@ function buildPlugin() {
               return { text: formatBehaviorGapReport() };
             case "optimize":
               return { text: formatOptimizationReport() };
+
+            // ── Version History ──
+            case "history": {
+              if (!subArgs) return { text: "Usage: /forge history <skill-name>" };
+              return { text: formatHistoryTimeline(subArgs) };
+            }
+            case "diff": {
+              if (!subArgs) return { text: "Usage: /forge diff <skill-name> [version]" };
+              const diffParts = subArgs.split(/\s+/);
+              const diffName = diffParts[0];
+              const diffVersion = diffParts[1] ? parseInt(diffParts[1], 10) : undefined;
+              if (diffParts[1] && (isNaN(diffVersion!) || diffVersion! < 1)) {
+                return { text: `Invalid version number: '${diffParts[1]}'. Use: /forge history ${diffName}` };
+              }
+              return { text: formatSkillDiff(diffName, diffVersion) };
+            }
 
             // ── Phase 3: Validation ──
             case "test": {
@@ -1076,6 +1107,10 @@ function buildPlugin() {
                 "  /forge compose        — Skill co-activation analysis",
                 "  /forge behavior_gaps  — Fallback/deferral detection",
                 "  /forge optimize       — Description mismatch report",
+                "",
+                "History:",
+                "  /forge history <n>    — Version history timeline",
+                "  /forge diff <n> [v]   — Unified diff between versions",
                 "",
                 "Validation:",
                 "  /forge test           — Health tests on deployed skills",

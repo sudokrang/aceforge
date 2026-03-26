@@ -11,6 +11,7 @@
 import * as fsSync from "fs";
 import * as path from "path";
 import * as os from "os";
+import { recordRevision } from "./history.js";
 
 // ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
 const HOME = os.homedir() || process.env.HOME || "";
@@ -258,6 +259,10 @@ export function retireSkill(skillName: string): boolean {
   }
   fsSync.rmSync(skillsDir, { recursive: true, force: true });
   logHealth(skillName, "retired");
+  try {
+    const retiredMdPath = path.join(retiredDir, "SKILL.md");
+    if (fsSync.existsSync(retiredMdPath)) recordRevision(skillName, fsSync.readFileSync(retiredMdPath, "utf-8"), "retire", "Retired via /forge retire");
+  } catch { /* non-critical */ }
   return true;
 }
 
@@ -271,6 +276,10 @@ export function reinstateSkill(skillName: string): boolean {
   }
   fsSync.rmSync(retiredDir, { recursive: true, force: true });
   logHealth(skillName, "reinstated");
+  try {
+    const reinstatedMdPath = path.join(skillsDir, "SKILL.md");
+    if (fsSync.existsSync(reinstatedMdPath)) recordRevision(skillName, fsSync.readFileSync(reinstatedMdPath, "utf-8"), "reinstate", "Reinstated via /forge reinstate");
+  } catch { /* non-critical */ }
   return true;
 }
 
