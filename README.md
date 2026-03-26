@@ -116,7 +116,7 @@ Skill generation uses two independent LLMs working in sequence:
 
 1. **Generator** (default: MiniMax M2.7) writes the SKILL.md from real trace data — actual arguments, actual failures, actual corrections. The prompt enforces progressive disclosure structure (When to Use → Pre-flight → Instructions → Error Recovery → Anti-Patterns) based on [SkillsBench](https://arxiv.org/abs/2602.12670)'s finding that focused skills with 2-3 modules outperform comprehensive documentation.
 
-2. **Reviewer** (default: DeepSeek Reasoner) critiques the generated skill with Chain of Thought reasoning. It evaluates trigger precision, instruction specificity, anti-pattern grounding, and security. Verdict: APPROVE, REVISE (one retry), or REJECT.
+2. **Reviewer** (default: DeepSeek Chat) critiques the generated skill against structured criteria. It evaluates trigger precision, instruction specificity, anti-pattern grounding, and security. Verdict: APPROVE, REVISE (one retry), or REJECT.
 
 Both models are provider-agnostic — any OpenAI-compatible `/chat/completions` endpoint works. Rate-limited to 8 calls per cycle with 2-second intervals.
 
@@ -393,7 +393,7 @@ Both generator and reviewer use standard OpenAI-compatible `/chat/completions`. 
 | Provider | Base URL | Notes |
 |---|---|---|
 | **MiniMax** (default generator) | `https://api.minimax.io/v1` | M2.7 — strong structured output |
-| **DeepSeek** (default reviewer) | `https://api.deepseek.com` | Reasoner — CoT critique |
+| **DeepSeek** (default reviewer) | `https://api.deepseek.com` | Chat — structured rubric review |
 | **OpenAI** | `https://api.openai.com/v1` | GPT-4o or GPT-5.4 |
 | **OpenRouter** | `https://openrouter.ai/api/v1` | Claude, Gemini, Llama, etc. |
 | **Local** (LM Studio, Ollama) | `http://127.0.0.1:1234/v1` | Fully offline |
@@ -417,7 +417,7 @@ AceForge is fully compatible with [OpenViking](https://github.com/volcengine/Ope
 | `ACEFORGE_GENERATOR_URL` | `https://api.minimax.io/v1` | Base URL override |
 | `ACEFORGE_REVIEWER_PROVIDER` | `deepseek` | Provider for skill review + LLM judge |
 | `ACEFORGE_REVIEWER_API_KEY` | from openclaw.json | API key override |
-| `ACEFORGE_REVIEWER_MODEL` | `deepseek-reasoner` | Model override |
+| `ACEFORGE_REVIEWER_MODEL` | `deepseek-chat` | Model override |
 | `ACEFORGE_REVIEWER_URL` | `https://api.deepseek.com` | Base URL override |
 | `ACEFORGE_NOTIFICATION_CHANNEL` | auto-detect | Force: `telegram`, `slack`, `log` |
 | `ACEFORGE_TELEGRAM_BOT_TOKEN` | from openclaw.json | Telegram bot token |
