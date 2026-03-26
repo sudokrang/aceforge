@@ -404,7 +404,7 @@ Notifications auto-detect your configured channel: Telegram, Slack, or log fallb
 
 ### OpenViking Compatible
 
-AceForge is fully compatible with [OpenViking](https://github.com/sudokrang/openviking) for context-enriched challenge generation. Circuit breaker: 5s timeout, 3 failures → open for 10 min.
+AceForge is fully compatible with [OpenViking](https://github.com/volcengine/OpenViking) for context-enriched challenge generation. Circuit breaker: 5s timeout, 3 failures → open for 10 min.
 
 <details>
 <summary><strong>Environment Variables</strong></summary>
