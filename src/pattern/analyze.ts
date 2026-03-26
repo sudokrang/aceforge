@@ -17,7 +17,7 @@
 import * as fsSync from "fs";
 import * as path from "path";
 import { appendJsonl } from "./store.js";
-import { notify } from "../notify.js";
+import { notify, flushDigest } from "../notify.js";
 import { generateSkillFromCandidate, writeProposal } from "../skill/generator.js";
 import { validateSkillMd } from "../skill/validator.js";
 import { generateSkillWithLLm, reviseSkillWithLLm, generateRemediationSkillWithLLm } from "../skill/llm-generator.js";
@@ -418,6 +418,9 @@ export async function analyzePatterns(): Promise<void> {
   } catch (err) {
     console.error(`[aceforge] watchdog error: ${(err as Error).message}`);
   }
+
+  // Flush digest if enabled — sends all queued notifications as one message
+  await flushDigest();
 }
 
 // ─── Gap Analysis → Remediation Skill Proposals ─────────────────────────

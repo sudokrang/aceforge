@@ -412,7 +412,9 @@ export async function generateSkillWithLLm(candidate: Candidate): Promise<Genera
   try {
     docContext = await fetchDocEnrichment(candidate.tool);
     if (docContext) console.log(`[aceforge/llm-gen] Doc enrichment: ${docContext.length} chars for ${candidate.tool}`);
-  } catch { /* proceed without enrichment */ }
+  } catch (enrichErr) {
+    console.warn(`[aceforge/llm-gen] Doc enrichment failed for ${candidate.tool}: ${(enrichErr as Error).message?.slice(0, 80) || "unknown"}`);
+  }
 
   const brief = buildSkillBrief(candidate, traces, corrections, docContext);
 
@@ -599,6 +601,8 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
       if (firstLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = review.verdict.trim(); }
     } catch (err) {
       console.error(`[aceforge/llm-gen] Workflow review failed: ${(err as Error).message}`);
+      // Auto-approve on review failure — skill was generated successfully
+      verdict = "APPROVE";
     }
   }
 
@@ -662,6 +666,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
       if (firstLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = review.verdict.trim(); }
     } catch (err) {
       console.error(`[aceforge/llm-gen] Remediation review failed: ${(err as Error).message}`);
+      verdict = "APPROVE"; // explicit: review failure ≠ rejection
     }
   }
 

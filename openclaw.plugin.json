@@ -32,6 +32,11 @@
         "default": "auto",
         "description": "Notification channel: telegram, slack, log, or auto (auto-detect)"
       },
+      "digestMode": {
+        "type": "boolean",
+        "default": false,
+        "description": "Queue notifications during analysis and send as a single digest message"
+      },
       "dryRun": {
         "type": "boolean",
         "default": false,

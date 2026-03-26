@@ -74,7 +74,20 @@ async function sendTelegram(
       body: JSON.stringify({ chat_id: cfg.chatId, text: message }),
     }
   );
-  if (!res.ok) throw new Error(`Telegram API ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    // Bug #15: Differentiate error types for actionable diagnostics
+    if (res.status === 401) {
+      throw new Error(`Telegram auth failed (401) — check ACEFORGE_TELEGRAM_BOT_TOKEN`);
+    } else if (res.status === 429) {
+      const retryAfter = res.headers.get("retry-after") || "unknown";
+      throw new Error(`Telegram rate limited (429) — retry after ${retryAfter}s`);
+    } else if (res.status === 400) {
+      throw new Error(`Telegram bad request (400) — check chat_id. Response: ${body.slice(0, 150)}`);
+    } else {
+      throw new Error(`Telegram API ${res.status}: ${body.slice(0, 150)}`);
+    }
+  }
   console.log(`[aceforge] Telegram sent: ${message.slice(0, 60)}`);
 }
 
@@ -87,7 +100,16 @@ async function sendSlack(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text: `[AceForge] ${message}` }),
   });
-  if (!res.ok) throw new Error(`Slack webhook ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (res.status === 403 || res.status === 401) {
+      throw new Error(`Slack auth failed (${res.status}) — check ACEFORGE_SLACK_WEBHOOK_URL`);
+    } else if (res.status === 429) {
+      throw new Error(`Slack rate limited (429) — too many notifications`);
+    } else {
+      throw new Error(`Slack webhook ${res.status}: ${body.slice(0, 150)}`);
+    }
+  }
   console.log(`[aceforge] Slack sent: ${message.slice(0, 60)}`);
 }
 
@@ -103,7 +125,20 @@ function logToFile(message: string): void {
   console.log(`[aceforge] Logged: ${message.slice(0, 60)}`);
 }
 
+// ─── Digest Mode ────────────────────────────────────────────────
+// ACEFORGE_NOTIFY_DIGEST=true queues messages during analysis cycles
+// and flushes them as a single combined message via flushDigest().
+const DIGEST_ENABLED = process.env.ACEFORGE_NOTIFY_DIGEST === "true";
+const digestQueue: string[] = [];
+
 export async function notify(message: string): Promise<void> {
+  // If digest mode is on, queue instead of sending immediately
+  if (DIGEST_ENABLED) {
+    digestQueue.push(message);
+    logToFile(message); // always persist locally
+    return;
+  }
+
   try {
     if (notifyConfig.channel === "telegram" && notifyConfig.telegram) {
       await sendTelegram(message, notifyConfig.telegram);
@@ -115,5 +150,34 @@ export async function notify(message: string): Promise<void> {
   } catch (err) {
     console.error(`[aceforge] ${notifyConfig.channel} send failed, queuing:`, err);
     logToFile(message);
+  }
+}
+
+/**
+ * Flush queued digest notifications as a single combined message.
+ * Call at the end of analyzePatterns() or agent_end cycle.
+ * No-op if digest mode is off or queue is empty.
+ */
+export async function flushDigest(): Promise<void> {
+  if (digestQueue.length === 0) return;
+
+  const count = digestQueue.length;
+  const combined = `AceForge Digest (${count} notification${count > 1 ? "s" : ""})\n` +
+    `${"─".repeat(40)}\n` +
+    digestQueue.join("\n─────\n");
+
+  // Drain the queue before sending (prevents double-flush)
+  digestQueue.length = 0;
+
+  try {
+    if (notifyConfig.channel === "telegram" && notifyConfig.telegram) {
+      await sendTelegram(combined, notifyConfig.telegram);
+    } else if (notifyConfig.channel === "slack" && notifyConfig.slack) {
+      await sendSlack(combined, notifyConfig.slack);
+    }
+    console.log(`[aceforge] Digest flushed: ${count} notifications`);
+  } catch (err) {
+    console.error(`[aceforge] Digest flush failed:`, err);
+    // Already logged individually via logToFile above
   }
 }
