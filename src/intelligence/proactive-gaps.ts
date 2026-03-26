@@ -137,6 +137,17 @@ export function detectBehaviorGaps(): BehaviorGap[] {
 
       if (!textToCheck.trim()) continue;
 
+      // Skip traces that contain AceForge's own source code — prevents self-detection
+      const argsLower = (entry.args_summary || "").toLowerCase();
+      if (argsLower.includes("aceforge") ||
+          argsLower.includes(".forge/") ||
+          argsLower.includes("/extensions/aceforge/") ||
+          argsLower.includes("proactive-gaps") ||
+          argsLower.includes("gap-detect") ||
+          /\/src\/(pattern|skill|intelligence|validation|viking)\//.test(argsLower)) {
+        continue;
+      }
+
       // Check each pattern category
       for (const pattern of FALLBACK_PATTERNS) {
         if (pattern.test(textToCheck)) {

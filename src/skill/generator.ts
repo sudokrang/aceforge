@@ -90,6 +90,28 @@ export function generateSkillFromCandidate(candidate: Candidate): { skillName: s
 export function writeProposal(skillName: string, skillMd: string): string {
   const proposalDir = path.join(FORGE_DIR, "proposals", skillName);
   fsSync.mkdirSync(proposalDir, { recursive: true });
-  fsSync.writeFileSync(path.join(proposalDir, "SKILL.md"), skillMd, "utf-8");
+
+  // Guarantee aceforge metadata exists on every proposal (LLM output may omit it)
+  let finalMd = skillMd;
+  if (!finalMd.includes("aceforge:")) {
+    const aceforgeBlock = [
+      "    aceforge:",
+      "      status: proposed",
+      `      proposed: ${new Date().toISOString()}`,
+      "      auto_generated: true",
+    ].join("\n");
+    // Insert after openclaw: block
+    if (finalMd.includes("openclaw:")) {
+      const categoryMatch = finalMd.match(/^(\s*category:\s*.+)$/m);
+      if (categoryMatch) {
+        finalMd = finalMd.replace(categoryMatch[0], categoryMatch[0] + "\n" + aceforgeBlock);
+      }
+    }
+  } else if (!finalMd.includes("status: proposed") && !finalMd.includes("status: deployed")) {
+    // Has aceforge block but missing status
+    finalMd = finalMd.replace(/aceforge:/, "aceforge:\n      status: proposed");
+  }
+
+  fsSync.writeFileSync(path.join(proposalDir, "SKILL.md"), finalMd, "utf-8");
   return proposalDir;
 }

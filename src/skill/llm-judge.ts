@@ -110,7 +110,7 @@ REASONING: <2-3 sentences explaining your assessment>`;
         model: config.reviewerModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
-        max_tokens: 500,
+        max_tokens: 800,
       }),
     });
 
