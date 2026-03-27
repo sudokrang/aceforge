@@ -332,8 +332,10 @@ async function callGenerator(url: string, apiKey: string, model: string, brief: 
     const preview = await res.text().catch(() => "(unreadable)");
     throw new Error(`Generator returned malformed JSON: ${preview.slice(0, 100)}`);
   }
-  const content = data.choices?.[0]?.message?.content;
+  let content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("Generator returned empty response");
+  // Strip CoT reasoning blocks (DeepSeek Reasoner, other CoT models)
+  content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   return content;
 }
 
