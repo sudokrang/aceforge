@@ -373,8 +373,23 @@ async function callReviewer(url: string, apiKey: string, model: string, reviewPr
 function fixFrontmatterNesting(md: string): string {
   const fmMatch = md.match(/^---\n([\s\S]*?)\n---/);
   if (!fmMatch) return md;
-  const fm = fmMatch[1];
+  let fm = fmMatch[1];
   const body = md.slice(fmMatch[0].length);
+
+  // Fix dot-notation: "openclaw.category: X" → proper nesting
+  const dotMatch = fm.match(/^\s*openclaw\.category:\s*(.+)$/m);
+  if (dotMatch) {
+    const dotValue = dotMatch[1].trim();
+    fm = fm.replace(/^\s*openclaw\.category:\s*.+\n?/m, "");
+    if (fm.includes("metadata:") && fm.includes("openclaw:")) {
+      fm = fm.replace(/(metadata:\s*\n\s+openclaw:)/, "$1\n      category: " + dotValue);
+    } else if (fm.includes("metadata:")) {
+      fm = fm.replace(/(metadata:)/, "$1\n    openclaw:\n      category: " + dotValue);
+    } else {
+      fm = fm.trimEnd() + "\nmetadata:\n  openclaw:\n    category: " + dotValue;
+    }
+    return "---\n" + fm + "\n---" + body;
+  }
 
   const flatCategoryMatch = fm.match(/^category:\s*(.+)$/m);
   if (!flatCategoryMatch) return md;
