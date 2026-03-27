@@ -194,6 +194,16 @@ export function autoFlagForRevision(skillName: string, failureContext: string): 
     return;
   }
 
+  // Dedup: skip if a revision proposal already exists for this skill
+  const proposalsDir = path.join(FORGE_DIR, "proposals");
+  if (fsSync.existsSync(proposalsDir)) {
+    const existing = fsSync.readdirSync(proposalsDir).filter((d: string) => d.startsWith(skillName + "-rev-"));
+    if (existing.length > 0) {
+      console.log(`[aceforge] revision already pending for ${skillName} (${existing.length} proposal(s)) — skipping`);
+      return;
+    }
+  }
+
   const original = fsSync.readFileSync(skillFile, "utf-8");
   const lines = original.split("\n");
 
