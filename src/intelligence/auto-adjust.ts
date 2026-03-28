@@ -188,9 +188,9 @@ export function handleCorrectionForSkill(
   // Check if we've hit the rewrite threshold
   if (checkRewriteThreshold(matchedSkill)) {
     notify(
-      `Skill Auto-Adjustment Alert\n` +
-      `${matchedSkill} has received 3+ micro-revisions in 30 days.\n` +
-      `Consider a full rewrite: /forge quality ${matchedSkill}`
+      `🔧 Auto-adjustment alert · ${matchedSkill}\n\n` +
+      `3+ micro-revisions in 30 days\n\n` +
+      `/forge quality ${matchedSkill}`
     ).catch(console.error);
   }
 

@@ -250,10 +250,9 @@ export function captureToolTrace(event: any, ctx: any, api?: any): void {
           if (effectiveness) {
             const direction = effectiveness.delta >= 0 ? "+" : "";
             notify(
-              "Skill Effectiveness Report\n" +
-              matchedSkill + "\n" +
-              (effectiveness.improved ? "Improved" : "Declined") + ": " + direction + effectiveness.delta + "% since deployment\n" +
-              stats.activations + " activations, " + Math.round(stats.successRate * 100) + "% success"
+              (effectiveness.improved ? "📈" : "📉") + " " + matchedSkill + "\n\n" +
+              (effectiveness.improved ? "Improved" : "Declined") + " " + direction + effectiveness.delta + "% since deployment\n" +
+              stats.activations + " activations · " + Math.round(stats.successRate * 100) + "% success"
             ).catch(() => {});
           }
         }

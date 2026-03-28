@@ -19,6 +19,7 @@
 import * as fsSync from "fs";
 import * as path from "path";
 import { FORGE_DIR, SKILLS_DIR, PatternEntry } from "../pattern/constants.js";
+import { bold, mono } from "../notify-format.js";
 
 // ─── Milestone Configuration ────────────────────────────────────────────
 
@@ -526,12 +527,12 @@ export function recordDistillation(skillName: string, milestone: number, meaning
 export function formatDistillationNotification(report: DistillationReport): string {
   const lines: string[] = [];
 
-  lines.push(`Trace Distillation Report — ${report.skill}`);
-  lines.push(`Milestone: ${report.milestone} activations`);
+  lines.push(`🔬 ${bold("Trace Distillation")} · ${report.skill}`);
+  lines.push(`Milestone: ${bold(String(report.milestone))} activations`);
   lines.push(``);
-  lines.push(`Traces: ${report.tracesAtDeploy} at deploy → ${report.tracesNow} now (+${report.newTraceCount})`);
-  lines.push(`Success: ${Math.round(report.summary.overallSuccessRate * 100)}% (${report.reflection.successRateDelta >= 0 ? "+" : ""}${report.reflection.successRateDelta}pp vs baseline)`);
-  lines.push(`Sessions: ${report.summary.distinctSessions} across ${report.summary.timeSpanDays} days`);
+  lines.push(`Traces  ${report.tracesAtDeploy} at deploy → ${report.tracesNow} now (+${report.newTraceCount})`);
+  lines.push(`Success  ${Math.round(report.summary.overallSuccessRate * 100)}% (${report.reflection.successRateDelta >= 0 ? "+" : ""}${report.reflection.successRateDelta}pp)`);
+  lines.push(`Span  ${report.summary.distinctSessions} sessions · ${report.summary.timeSpanDays} days`);
 
   if (report.divergences.length > 0) {
     lines.push(``);

@@ -17,6 +17,7 @@
 import * as fsSync from "fs";
 import * as path from "path";
 import { appendJsonl } from "./store.js";
+import { bold, mono, compose } from "../notify-format.js";
 import { notify, flushDigest } from "../notify.js";
 import { generateSkillFromCandidate, writeProposal } from "../skill/generator.js";
 import { validateSkillMd } from "../skill/validator.js";
@@ -146,12 +147,10 @@ export async function analyzePatterns(): Promise<void> {
               const summary = descMatch ? descMatch[1].slice(0, 120) : "Evolved skill";
 
               notify(
-                `Skill Evolution Proposal\n` +
-                `${evoName} (replaces ${deployedSkill})\n` +
-                `Tool: ${key}\n` +
-                `${newTraceCount} new traces since deployment\n` +
-                `Summary: ${summary}\n` +
-                `Use: /forge approve ${evoName}  or  /forge reject ${evoName}`
+                `🔄 ${bold("Evolution Proposal")}\n\n` +
+                `${bold(evoName)}\n` +
+                `Replaces ${deployedSkill} · ${newTraceCount} new traces\n\n` +
+                `${mono("/forge approve " + evoName)}\n${mono("/forge reject " + evoName)}`
               ).catch(err => console.error("[aceforge] notify error:", err));
               evolutionProposed = true;
             }
@@ -473,13 +472,12 @@ async function analyzeGaps(preloadedPatterns?: PatternEntry[]): Promise<void> {
       const severityLabel = gap.severity >= 12 ? "HIGH" : gap.severity >= 6 ? "MEDIUM" : "LOW";
 
       notify(
-        `Gap Remediation Proposal\n` +
-        `${skillName}\n` +
-        `Tool: ${gap.tool} | Severity: ${severityLabel}\n` +
-        `Gap: ${gap.gapType.replace(/_/g, " ")}\n` +
+        `🛡️ ${bold("Remediation Proposal")}\n\n` +
+        `${bold(skillName)}\n` +
+        `${gap.tool} · ${severityLabel} · ${gap.gapType.replace(/_/g, " ")}\n` +
         `${gap.evidence.slice(0, 2).join("; ")}` +
-        notesSuffix + `\n` +
-        `Use: /forge approve ${skillName}  or  /forge reject ${skillName}`
+        notesSuffix + `\n\n` +
+        `${mono("/forge approve " + skillName)}\n${mono("/forge reject " + skillName)}`
       ).catch(err => console.error("[aceforge] notify error:", err));
 
       console.log(`[aceforge] remediation proposal written: ${skillName}`);

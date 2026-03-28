@@ -71,7 +71,7 @@ async function sendTelegram(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: cfg.chatId, text: message }),
+      body: JSON.stringify({ chat_id: cfg.chatId, text: message, parse_mode: "HTML" }),
     }
   );
   if (!res.ok) {
@@ -98,7 +98,7 @@ async function sendSlack(
   const res = await fetch(cfg.webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: `[AceForge] ${message}` }),
+    body: JSON.stringify({ text: message }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -123,6 +123,10 @@ function logToFile(message: string): void {
     }) + "\n";
   fsSync.appendFileSync(notifFile, entry);
   console.log(`[aceforge] Logged: ${message.slice(0, 60)}`);
+}
+
+export function getNotifyChannel(): "telegram" | "slack" | "log" {
+  return notifyConfig.channel;
 }
 
 // ─── Digest Mode ────────────────────────────────────────────────
@@ -162,9 +166,8 @@ export async function flushDigest(): Promise<void> {
   if (digestQueue.length === 0) return;
 
   const count = digestQueue.length;
-  const combined = `AceForge Digest (${count} notification${count > 1 ? "s" : ""})\n` +
-    `${"─".repeat(40)}\n` +
-    digestQueue.join("\n─────\n");
+  const combined = `📬 AceForge Digest · ${count} notification${count !== 1 ? "s" : ""}\n\n` +
+    digestQueue.join("\n\n");
 
   // Drain the queue before sending (prevents double-flush)
   digestQueue.length = 0;

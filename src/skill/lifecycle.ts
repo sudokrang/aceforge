@@ -228,10 +228,9 @@ export function autoFlagForRevision(skillName: string, failureContext: string): 
   fsSync.writeFileSync(path.join(revDir, "SKILL.md"), revised, "utf-8");
 
   notify(
-    `Skill Flagged for Revision\n` +
-    `${skillName}\n` +
-    `Cause: ${failureContext}\n` +
-    `Review: /forge approve ${revName}`
+    `⚠️ Revision flagged · ${skillName}\n\n` +
+    `${failureContext}\n\n` +
+    `/forge approve ${revName}`
   ).catch(console.error);
 }
 

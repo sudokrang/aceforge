@@ -16,6 +16,7 @@ import { detectCorrectionPatterns } from "./src/pattern/detect.js";
 import { analyzePatterns } from "./src/pattern/analyze.js";
 import { buildHierarchicalSkillIndex } from "./src/skill/index.js";
 import { notify } from "./src/notify.js";
+import { bold, mono, metric, compose, actions as fmtActions } from "./src/notify-format.js";
 import { resetLlmRateLimit } from "./src/skill/llm-generator.js";
 import {
   recordActivation,
@@ -143,7 +144,7 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
     recordRevision(skillName, deployedMd, "deploy", "Deployed via /forge approve");
   } catch { /* non-critical */ }
 
-  notify(`Skill deployed: ${skillName}`);
+  notify(_skillAction("✅", "Skill deployed", skillName));
   return { ok: true, message: `Skill '${skillName}' deployed. Active now.` };
 }
 
@@ -327,11 +328,14 @@ function buildPlugin() {
             if (behaviorGaps.length > 0) {
               const criticalGaps = behaviorGaps.filter(g => g.count >= 5);
               if (criticalGaps.length > 0) {
-                notify(
-                  `Proactive Gap Alert\n` +
-                  `${criticalGaps.length} critical behavior gap(s):\n` +
-                  criticalGaps.map(g => `${g.domain}: ${g.gapType} (${g.count}x)`).join("\n")
-                ).catch(() => {});
+                const gapLines = criticalGaps.map(g => {
+                    const icon = g.gapType === "fallback" ? "🔴" : g.gapType === "deferral" ? "🟡" : "🟠";
+                    return `${icon} ${bold(g.domain)}  ${g.gapType} (${g.count}×)`;
+                  }).join("\n");
+                  notify(
+                    `🔍 ${bold("Proactive Gap Alert")}\n\n` +
+                    gapLines
+                  ).catch(() => {});
               }
             }
             updateTreeWithBehaviorGaps();
@@ -574,6 +578,10 @@ function buildPlugin() {
           const sub = spaceIdx === -1 ? raw.toLowerCase() : raw.slice(0, spaceIdx).toLowerCase();
           const subArgs = spaceIdx === -1 ? "" : raw.slice(spaceIdx + 1).trim();
 
+          // Formatting helper for action notifications (uses notify-format.ts)
+          const _skillAction = (icon: string, verb: string, name: string) =>
+            `${icon} ${bold(verb)}  ${mono(name)}`;
+
           switch (sub) {
             // ── No subcommand: dashboard ──
             case "":
@@ -585,10 +593,10 @@ function buildPlugin() {
               const candidateCount = countLines(path.join(FORGE_DIR, "candidates.jsonl"));
               const threshold = getEffectiveCrystallizationThreshold();
 
-              let text = `AceForge v${getPluginVersion()} Dashboard\n\n`;
-              text += `📊 Skills: ${active.length} active · ${proposals.length} proposals · ${retired.length} retired\n`;
-              text += `📈 Patterns: ${patternCount} traced · ${candidateCount} candidates\n`;
-              text += `🔍 Threshold: ${threshold}x recurrences\n`;
+              let text = `⚡ ${bold("AceForge v" + getPluginVersion())}\n\n`;
+              text += `${metric("Skills", `${active.length} active · ${proposals.length} pending · ${retired.length} retired`)}\n`;
+              text += `${metric("Traces", `${patternCount} patterns · ${candidateCount} candidates`)}\n`;
+              text += `${metric("Threshold", `${threshold}× recurrences`)}\n`;
 
               try {
                 const vikingStatus = await checkVikingHealth();
@@ -638,12 +646,12 @@ function buildPlugin() {
                 const allProposals = listProposals();
                 if (allProposals.length === 0) return { text: "No proposals to reject." };
                 for (const p of allProposals) deleteProposal(p);
-                notify(`Bulk rejected ${allProposals.length} proposals: ${allProposals.join(", ")}`);
+                notify(`❌ ${bold("Bulk rejected")}  ${allProposals.length} proposals`);
                 return { text: `Rejected all ${allProposals.length} proposals: ${allProposals.join(", ")}` };
               }
               const deleted = deleteProposal(subArgs);
               if (!deleted) return { text: `Proposal '${subArgs}' not found.` };
-              notify(`Skill rejected: ${subArgs}`);
+              notify(_skillAction("❌", "Skill rejected", subArgs));
               return { text: `Skill '${subArgs}' rejected.` };
             }
             case "upgrade": {
@@ -677,7 +685,7 @@ function buildPlugin() {
               recordActivation(oldName, true);
               const toolMatch = oldName.match(/^(.+?)(?:-guard|-skill|-v\d+|-rev\d+)?$/);
               if (toolMatch) recordDeploymentBaseline(oldName, toolMatch[1]);
-              notify(`Skill upgraded: ${oldName}`);
+              notify(_skillAction("⬆️", "Skill upgraded", oldName));
               try { buildCapabilityTree(); } catch {}
               try {
                 const upgradedMd = fs.readFileSync(path.join(SKILLS_DIR, oldName, "SKILL.md"), "utf-8");
@@ -710,14 +718,14 @@ function buildPlugin() {
                 const rolledMd = fs.readFileSync(path.join(SKILLS_DIR, subArgs, "SKILL.md"), "utf-8");
                 recordRevision(subArgs, rolledMd, "rollback", "Rolled back via /forge rollback");
               } catch { /* non-critical */ }
-              notify(`Skill rolled back: ${subArgs}`);
+              notify(_skillAction("↩️", "Skill rolled back", subArgs));
               return { text: `Skill '${subArgs}' rolled back.` };
             }
             case "retire": {
               if (!subArgs) return { text: "Usage: /forge retire <skill-name>" };
               const done = retireSkill(subArgs);
               if (!done) return { text: `Skill '${subArgs}' not found.` };
-              notify(`Skill retired: ${subArgs}`);
+              notify(_skillAction("🛑", "Skill retired", subArgs));
               try { buildCapabilityTree(); } catch {}
               return { text: `Skill '${subArgs}' retired.` };
             }
@@ -725,7 +733,7 @@ function buildPlugin() {
               if (!subArgs) return { text: "Usage: /forge reinstate <skill-name>" };
               const done = reinstateSkill(subArgs);
               if (!done) return { text: `Retired skill '${subArgs}' not found.` };
-              notify(`Skill reinstated: ${subArgs}`);
+              notify(_skillAction("♻️", "Skill reinstated", subArgs));
               return { text: `Skill '${subArgs}' reinstated.` };
             }
 
