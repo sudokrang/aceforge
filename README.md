@@ -6,8 +6,8 @@
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://openclaw.ai"><img src="https://img.shields.io/badge/OpenClaw-Plugin-orange" alt="OpenClaw Plugin"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.8.2-green" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-363%2F363-brightgreen" alt="Tests">
+  <a href="https://github.com/sudokrang/aceforge/blob/main/CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.9.0-green" alt="Version"></a>
+  <img src="https://img.shields.io/badge/tests-412%2F412-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/adversarial-23%2F23-brightgreen" alt="Adversarial">
 </p>
 
@@ -32,6 +32,7 @@
 - [Skill Evolution & Lifecycle](#skill-evolution--lifecycle)
 - [Intelligence](#intelligence)
 - [Validation](#validation)
+- [Evolution](#evolution)
 - [Security](#security)
 - [Commands](#commands)
 - [Installation](#installation)
@@ -84,9 +85,9 @@ AceForge operates as a 12-stage pipeline that runs continuously alongside your a
   Credential scan     LLM judge (40-70)     /forge reject <n>
   Path traversal                                    ↓
   7. Deploy           8. Evolve             9. Retire
-  skills/ directory   50+ new traces →      Watchdog flags
-  Baseline recorded   revise, not rewrite   A/B compares versions
-  Token-budgeted      Data-driven updates   Underperformers flagged
+  skills/ directory   SRLR distillation     Watchdog flags
+  Baseline recorded   at 500/2000/5000      A/B compares versions
+  Token-budgeted      /forge evolve + diff  Underperformers flagged
                               ↓
   10. Propagate       11. Compose           12. Validate
   Cross-session       Co-activation         Health tests (CLI/path/URL)
@@ -159,6 +160,18 @@ This ensures no tool falls through the cracks regardless of its deployment state
 After 50+ new traces accumulate since deployment, AceForge **revises** existing skills rather than regenerating from scratch. The revision prompt includes only the new data — new success patterns, new failures, new corrections — and instructs the generator to preserve what works while updating what doesn't.
 
 **Design intent:** Trajectory-level revision outperforms full regeneration per [SE-Agent (arXiv:2508.02085)](https://arxiv.org/abs/2508.02085). Skills accumulate operational wisdom over time rather than losing it to rewrites.
+
+### Milestone Distillation
+
+At activation milestones (500, 2000, 5000), AceForge runs a Summarize–Reflect–Locate–Revise (SRLR) cycle on each deployed skill's trace corpus. The distillation computes what argument patterns, failure modes, and user corrections emerged since deployment, identifies divergences between the skill's instructions and actual usage, and surfaces actionable recommendations. Meaningful divergences trigger a notification; `/forge distill <skill>` shows the full report anytime.
+
+**Design intent:** The SRLR loop follows [K2-Agent (arXiv:2603.00676)](https://arxiv.org/abs/2603.00676)'s knowledge refinement approach. Milestone-based checkpoints (not continuous mutation) come from [SAGE (arXiv:2512.17102)](https://arxiv.org/abs/2512.17102)'s Sequential Rollout — skills accumulate operational wisdom at each tier rather than evolving reactively.
+
+### Novel Success Capture
+
+When the agent successfully uses a tool for the first time — one that has no existing skill, no pending proposal, and no prior failures — AceForge captures it as a novel one-shot success. These captures queue for human review via `/forge captures` and can be promoted to lower the crystallization threshold for that tool, or dismissed.
+
+**Design intent:** Inspired by [Voyager (arXiv:2305.16291)](https://arxiv.org/abs/2305.16291)'s self-verification before adding skills to the library. Each capture passes a 6-check novelty filter before being recorded.
 
 ### Maturity Stages
 
@@ -341,6 +354,16 @@ AceForge uses a single `/forge` command with subcommands:
 | `/forge behavior_gaps` | Fallback / deferral / uncertainty detection |
 | `/forge optimize` | Description-language mismatch report |
 
+### Evolution
+
+| Command | Description |
+|---|---|
+| `/forge evolve <n>` | LLM-powered skill revision with trace delta + unified diff |
+| `/forge distill <n>` | SRLR trace distillation report (no LLM revision) |
+| `/forge captures` | List novel one-shot success captures |
+| `/forge capture promote <tool>` | Promote a capture for crystallization |
+| `/forge capture dismiss <tool>` | Dismiss a capture |
+
 ### History
 
 | Command | Description |
@@ -379,7 +402,7 @@ openclaw plugins list | grep aceforge
 Expected:
 
 ```
-[aceforge] v0.8.2 — all hooks, tools, and commands registered
+[aceforge] v0.9.0 — all hooks, tools, commands, and evolution engine registered
 ```
 
 ---
@@ -470,7 +493,7 @@ export ACEFORGE_REVIEWER_API_KEY=not-needed
 ├── openclaw.plugin.json        # Plugin manifest + configSchema
 ├── index.ts                    # Entry — hooks, tools, /forge router, startup
 ├── tests/
-│   └── test-validator.ts       # 363 assertions — validator, quality, adversarial, drift detection
+│   └── test-validator.ts       # 412 assertions — validator, quality, adversarial, drift detection
 └── src/
     ├── notify.ts               # Channel router (Telegram / Slack / log)
     ├── pattern/
@@ -503,6 +526,10 @@ export ACEFORGE_REVIEWER_API_KEY=not-needed
     │   ├── health-test.ts      # Verify CLIs, paths, endpoints
     │   ├── grounded-challenges.ts  # Test scenarios from Viking/patterns
     │   └── adversarial.ts      # 23 mutation variants against validator
+    ├── evolution/
+    │   ├── distill.ts          # SRLR trace distillation at milestones (500/2000/5000)
+    │   ├── capture-novel.ts    # Novel one-shot success capture
+    │   └── evolve-command.ts   # /forge evolve — LLM revision + unified diff
     └── viking/
         └── client.ts           # OpenViking context engine client (circuit breaker)
 ```
@@ -541,7 +568,7 @@ The cross-session pattern state (`cross-session-patterns.json`) provides a persi
 Every major design decision in AceForge is grounded in peer-reviewed research. The full citation table:
 
 <details>
-<summary><strong>30 citations across 12 research areas</strong></summary>
+<summary><strong>35 citations across 14 research areas</strong></summary>
 
 | Concept | Paper | How AceForge Uses It |
 |---|---|---|
@@ -575,6 +602,11 @@ Every major design decision in AceForge is grounded in peer-reviewed research. T
 | DAG-based pipeline composition | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Co-activation detection for future DAG orchestration |
 | Multi-agent skill sharing | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Capability tree as shareable ecosystem signal |
 | Skill persistence as memory | [Memento-Skills](https://arxiv.org/abs/2603.18743) (Mar 2026) | Skills persist across sessions as evolving procedural memory |
+| Milestone-based skill accumulation | [SAGE](https://arxiv.org/abs/2512.17102) (Dec 2025) | Sequential Rollout — distillation at 500/2000/5000 activation milestones |
+| Summarize–Reflect–Locate–Revise | [K2-Agent](https://arxiv.org/abs/2603.00676) (Mar 2026) | SRLR loop for trace distillation and knowledge refinement |
+| On-policy skill preservation | [SDFT](https://arxiv.org/abs/2601.19897) (Jan 2026) | Self-distillation preserves prior capabilities during evolution |
+| Self-verification before library add | [Voyager](https://arxiv.org/abs/2305.16291) (May 2023) | Novel capture validates first-time successes before queuing |
+| Autonomous experiential learning | [SEAgent](https://arxiv.org/abs/2508.04700) (Aug 2025) | Specialist-to-generalist training; curriculum-based task generation |
 
 </details>
 
