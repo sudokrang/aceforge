@@ -140,7 +140,18 @@ export function handleCorrectionForSkill(
     }
   }
 
-  if (!matchedSkill) return;
+  if (!matchedSkill) {
+    // Log corrections that couldn't be routed to any skill
+    appendJsonl("filtered-candidates.jsonl", {
+      ts: new Date().toISOString(),
+      tool: toolName,
+      reason: "correction_no_skill",
+      detail: `Correction received but no deployed skill matches tool '${toolName}'`,
+      correction_text: correctionText?.slice(0, 100) || "",
+    });
+    console.log(`[aceforge] correction for '${toolName}' discarded — no matching skill deployed`);
+    return;
+  }
 
   // N-H1 fix: Build human-readable revision content
   // correctionText = user's natural language correction (e.g., "no, actually use --rm flag")
@@ -183,16 +194,6 @@ export function handleCorrectionForSkill(
     ).catch(console.error);
   }
 
-  // Audit fix: log corrections that couldn't be routed to any skill
-  // This makes them visible in /forge filtered
-  appendJsonl("filtered-candidates.jsonl", {
-    ts: new Date().toISOString(),
-    tool: toolName,
-    reason: "correction_no_skill",
-    detail: `Correction received but no deployed skill matches tool '${toolName}'`,
-    correction_text: correctionText?.slice(0, 100) || "",
-  });
-  console.log(`[aceforge] correction for '${toolName}' discarded — no matching skill deployed`);
 }
 
 // ─── Get Adjustment History ─────────────────────────────────────────────

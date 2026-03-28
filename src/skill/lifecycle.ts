@@ -12,6 +12,7 @@ import * as fsSync from "fs";
 import * as path from "path";
 import * as os from "os";
 import { recordRevision } from "./history.js";
+import { notify } from "../notify.js";
 
 // ─── H8-fix: Use os.homedir() instead of process.env.HOME || "~"
 const HOME = os.homedir() || process.env.HOME || "";
@@ -162,25 +163,26 @@ export function recordVerification(skillName: string, passed: boolean, resultSum
     result_summary: resultSummary.slice(0, 200),
   }) + "\n";
   fsSync.appendFileSync(verifFile, entry);
+
+  // Populate in-memory cache (keeps last 3 per skill for checkVerification)
+  if (!_verifCache.has(skillName)) _verifCache.set(skillName, []);
+  const cache = _verifCache.get(skillName)!;
+  cache.push({ passed });
+  if (cache.length > 3) cache.shift();
 }
 
+// In-memory verification cache: tracks last 3 results per skill
+// Avoids full-file read of verifications.jsonl on every managed tool call
+const _verifCache = new Map<string, { passed: boolean }[]>();
+
 export function checkVerification(skillName: string): boolean | null {
-  const verifFile = path.join(FORGE_DIR, "verifications.jsonl");
-  if (!fsSync.existsSync(verifFile)) return null;
+  const cached = _verifCache.get(skillName);
+  if (!cached || cached.length < 3) return null;
 
-  const lines = fsSync.readFileSync(verifFile, "utf-8").trim().split("\n");
-  const skillEntries = lines
-    .filter(l => l.trim().length > 0)
-    .map(l => { try { return JSON.parse(l); } catch { return null; } })
-    .filter(Boolean)
-    .filter((e: { skill: string }) => e.skill === skillName)
-    .slice(-3);
-
-  if (skillEntries.length < 3) return null;
-
-  const failures = skillEntries.filter((e: { passed: boolean }) => !e.passed).length;
+  const last3 = cached.slice(-3);
+  const failures = last3.filter(e => !e.passed).length;
   if (failures >= 2) return false;
-  const successes = skillEntries.filter((e: { passed: boolean }) => e.passed).length;
+  const successes = last3.filter(e => e.passed).length;
   if (successes === 3) return true;
   return null;
 }
@@ -225,14 +227,12 @@ export function autoFlagForRevision(skillName: string, failureContext: string): 
   fsSync.mkdirSync(revDir, { recursive: true });
   fsSync.writeFileSync(path.join(revDir, "SKILL.md"), revised, "utf-8");
 
-  import("../notify.js").then(({ notify }) => {
-    notify(
-      `Skill Flagged for Revision\n` +
-      `${skillName}\n` +
-      `Cause: ${failureContext}\n` +
-      `Review: /forge approve ${revName}`
-    ).catch(console.error);
-  }).catch(console.error);
+  notify(
+    `Skill Flagged for Revision\n` +
+    `${skillName}\n` +
+    `Cause: ${failureContext}\n` +
+    `Review: /forge approve ${revName}`
+  ).catch(console.error);
 }
 
 export function checkAndTriggerRevision(skillName: string): void {
