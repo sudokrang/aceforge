@@ -228,10 +228,10 @@ export function summarizeBehaviorGaps(): GapSummary[] {
   for (const [key, gapList] of groups) {
     const [domain, gapType] = key.split(":");
     const suggestedActions: Record<string, string> = {
-      fallback: `Create skills for ${domain} to handle tasks the agent currently can't perform`,
-      deferral: `Create proactive skills that execute automatically instead of asking for permission`,
-      uncertainty: `Create skills with explicit verification steps to reduce uncertainty`,
-      infrastructure: `Document required tools/access in skills or create setup-verification skills`,
+      fallback: `Your agent hit a wall on ${domain} tasks — it tried but couldn't complete them. Run /forge gaps to see details, then /forge gap_propose to generate a remediation skill.`,
+      deferral: `Your agent kept asking for permission on ${domain} tasks instead of acting. If you want it to act autonomously, create a skill that grants explicit permission for these operations.`,
+      uncertainty: `Your agent wasn't confident about ${domain} tasks — hedging and second-guessing. A skill with clear verification steps would eliminate the ambiguity.`,
+      infrastructure: `Your agent needed tools or access it doesn't have for ${domain} tasks. Check what's missing with /forge gaps, then either install the required tool or create a skill that documents the setup.`,
     };
 
     summaries.push({

@@ -376,10 +376,14 @@ function buildPlugin() {
                     msg += `\n\nIt said things like:\n${exLines}`;
                   }
 
-                  // Actionable suggestion
+                  // Actionable suggestion + commands
                   if (g.suggestedAction) {
-                    msg += `\n\n→ ${g.suggestedAction}`;
+                    msg += `\n\n${g.suggestedAction}`;
                   }
+
+                  // Always show next-step commands
+                  msg += `\n\n${mono("/forge gaps")} — full gap details`;
+                  msg += `\n${mono("/forge behavior_gaps")} — all behavior patterns`;
 
                   gapMessages.push(msg);
                 }
