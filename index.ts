@@ -332,14 +332,38 @@ function buildPlugin() {
             if (behaviorGaps.length > 0) {
               const criticalGaps = behaviorGaps.filter(g => g.count >= 5);
               if (criticalGaps.length > 0) {
-                const gapLines = criticalGaps.map(g => {
-                    const icon = g.gapType === "fallback" ? "🔴" : g.gapType === "deferral" ? "🟡" : "🟠";
-                    return `${icon} ${bold(g.domain)}  ${g.gapType} (${g.count}×)`;
-                  }).join("\n");
-                  notify(
-                    `🔍 ${bold("Proactive Gap Alert")}\n\n` +
-                    gapLines
-                  ).catch(() => {});
+                // Build human-readable notification per gap
+                const gapMessages: string[] = [];
+                for (const g of criticalGaps) {
+                  // Translate internal type to plain language
+                  const what: Record<string, string> = {
+                    fallback: "couldn't handle",
+                    deferral: "asked permission instead of acting on",
+                    uncertainty: "was unsure about",
+                    infrastructure: "lacked tools/access for",
+                  };
+                  const verb = what[g.gapType] || "struggled with";
+
+                  let msg = `Your agent ${verb} ${bold(String(g.count))} ${g.domain} tasks`;
+
+                  // Show 1-2 real examples so the user understands what happened
+                  if (g.examples && g.examples.length > 0) {
+                    const exLines = g.examples.slice(0, 2).map((ex: string) => `  "${ex.slice(0, 70)}"`).join("\n");
+                    msg += `\n\nIt said things like:\n${exLines}`;
+                  }
+
+                  // Actionable suggestion
+                  if (g.suggestedAction) {
+                    msg += `\n\n→ ${g.suggestedAction}`;
+                  }
+
+                  gapMessages.push(msg);
+                }
+
+                notify(
+                  `🔍 ${bold("Agent Behavior Gap")}\n\n` +
+                  gapMessages.join("\n\n")
+                ).catch(() => {});
               }
             }
             updateTreeWithBehaviorGaps();
