@@ -41,7 +41,7 @@ const FORMAT_MAP: Record<string, FormatType> = {
   log:      "plain",
 };
 
-// Legacy compat: re-export channel type for any consumers
+// Channel type — exported for type consumers. Formatting primitives use FormatType internally.
 export type NotifyChannel = "telegram" | "slack" | "discord" | "log" | "plain";
 
 let _format: FormatType | null = null;

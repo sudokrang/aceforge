@@ -17,7 +17,7 @@
 import * as fsSync from "fs";
 import * as path from "path";
 import { appendJsonl } from "./store.js";
-import { bold, mono, compose } from "../notify-format.js";
+import { bold, mono } from "../notify-format.js";
 import { notify, flushDigest } from "../notify.js";
 import { generateSkillFromCandidate, writeProposal } from "../skill/generator.js";
 import { validateSkillMd } from "../skill/validator.js";
