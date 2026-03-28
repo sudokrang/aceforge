@@ -35,10 +35,20 @@ function loadNotifyConfig(): NotifyConfig {
   // NOTE: allowFrom contains authorized sender identifiers (e.g. phone numbers),
   // NOT Telegram chat_ids. Telegram chat_id comes from Message.chat.id.
   // Priority: ACEFORGE_OWNER_CHAT_ID env > config identityLinks > hardcoded fallback.
-  const tgChatId =
-    process.env.ACEFORGE_OWNER_CHAT_ID ||
-    (config as any)?.session?.identityLinks?.sean?.find((l: string) => l.startsWith("telegram:"))?.split(":")[1] ||
-    ""; // No hardcoded fallback — configure ACEFORGE_OWNER_CHAT_ID
+  // Resolve chat ID: env var first, then scan ALL identityLinks for a telegram: entry
+  let resolvedChatId = process.env.ACEFORGE_OWNER_CHAT_ID || "";
+  if (!resolvedChatId) {
+    const links = (config as any)?.session?.identityLinks;
+    if (links && typeof links === "object") {
+      for (const entries of Object.values(links)) {
+        if (Array.isArray(entries)) {
+          const tgLink = entries.find((l: string) => typeof l === "string" && l.startsWith("telegram:"));
+          if (tgLink) { resolvedChatId = tgLink.split(":")[1] || ""; break; }
+        }
+      }
+    }
+  }
+  const tgChatId = resolvedChatId;
   const telegramAvailable = !!(tgToken && tgChatId);
 
   const slackWebhook = process.env.ACEFORGE_SLACK_WEBHOOK_URL || "";
