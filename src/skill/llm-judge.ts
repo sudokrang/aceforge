@@ -42,17 +42,8 @@ async function rateLimitedFetch(url: string, init: RequestInit): Promise<Respons
   return res;
 }
 
-// Config imported from llm-generator
-
-const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
-  deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-chat" },
-  openai:     { url: "https://api.openai.com/v1",    model: "gpt-4o" },
-  minimax:    { url: "https://api.minimax.io/v1",    model: "MiniMax-M2.7" },
-  openrouter: { url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },
-};
-
-// ─── Config cache (avoids reading openclaw.json on every call) ──
-const CONFIG_CACHE_TTL_MS = 60_000; // 60 seconds
+// PROVIDER_DEFAULTS imported from llm-generator.ts — single source of truth
+// loadLlmConfig also imported from there (uses the shared defaults)
 
 
 
@@ -107,13 +98,19 @@ RECOMMENDATION: <upgrade|keep|borderline>
 REASONING: <2-3 sentences explaining your assessment>`;
 
   try {
-    const res = await rateLimitedFetch(`${config.reviewerUrl}/chat/completions`, {
+    const endpoint = config.reviewerApiFormat === "anthropic" ? `${config.reviewerUrl}/v1/messages` : `${config.reviewerUrl}/chat/completions`;
+    const headers = config.reviewerApiFormat === "anthropic"
+      ? { "Content-Type": "application/json", "x-api-key": config.reviewerKey, "anthropic-version": "2023-06-01" }
+      : { "Content-Type": "application/json", "Authorization": `Bearer ${config.reviewerKey}` };
+    const res = await rateLimitedFetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${config.reviewerKey}`,
-      },
-      body: JSON.stringify({
+      headers,
+      body: JSON.stringify(config.reviewerApiFormat === "anthropic" ? {
+        model: config.reviewerModel,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: 800,
+      } : {
         model: config.reviewerModel,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
@@ -126,8 +123,10 @@ REASONING: <2-3 sentences explaining your assessment>`;
       return null;
     }
 
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const content = data.choices?.[0]?.message?.content || "";
+    const data = await res.json() as any;
+    const content = config.reviewerApiFormat === "anthropic"
+      ? (data.content?.find((b: any) => b.type === "text")?.text || "")
+      : (data.choices?.[0]?.message?.content || "");
 
     const scoreMatch = content.match(/SCORE:\s*(\d+)/);
     const recMatch = content.match(/RECOMMENDATION:\s*(upgrade|keep|borderline)/i);

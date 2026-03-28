@@ -74,7 +74,9 @@ interface TraceEntry {
 
 interface LlmConfig {
   generatorKey: string; generatorUrl: string; generatorModel: string; generatorProvider: string;
+  generatorApiFormat: "openai" | "anthropic";
   reviewerKey: string; reviewerUrl: string; reviewerModel: string; reviewerProvider: string;
+  reviewerApiFormat: "openai" | "anthropic";
 }
 
 interface GenerationResult {
@@ -86,11 +88,20 @@ interface GenerationResult {
 
 // ─── Provider defaults ──────────────────────────────────────────
 
-const PROVIDER_DEFAULTS: Record<string, { url: string; model: string }> = {
+export const PROVIDER_DEFAULTS: Record<string, { url: string; model: string; api?: string }> = {
   minimax:    { url: "https://api.minimax.io/v1",    model: "MiniMax-M2.7" },
   deepseek:   { url: "https://api.deepseek.com",     model: "deepseek-chat" },
   openai:     { url: "https://api.openai.com/v1",    model: "gpt-4o" },
   openrouter: { url: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4" },
+  anthropic:  { url: "https://api.anthropic.com",     model: "claude-sonnet-4-20250514", api: "anthropic-messages" },
+  ollama:     { url: "http://127.0.0.1:11434/v1",    model: "llama3.2" },
+  lmstudio:   { url: "http://127.0.0.1:1234/v1",     model: "local-model" },
+  vllm:       { url: "http://127.0.0.1:8000/v1",     model: "local-model" },
+  cerebras:   { url: "https://api.cerebras.ai/v1",    model: "zai-glm-4.7" },
+  huggingface: { url: "https://api-inference.huggingface.co/v1", model: "deepseek-ai/DeepSeek-R1" },
+  kimi:       { url: "https://api.moonshot.cn/v1",    model: "kimi-k2.5" },
+  together:   { url: "https://api.together.xyz/v1",   model: "meta-llama/Llama-3-70b-chat-hf" },
+  groq:       { url: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile" },
 };
 
 // ─── Config cache (avoids reading openclaw.json on every call) ──
@@ -117,15 +128,22 @@ export function loadLlmConfig(): LlmConfig {
   const revCfg = providers?.[revProvider] || {};
   const revDef = PROVIDER_DEFAULTS[revProvider] || { url: "", model: "" };
 
+  // Detect API format: check openclaw.json "api" field, then provider defaults, then assume openai
+  const genApiField = genCfg.api || genDef.api || "";
+  const revApiField = revCfg.api || revDef.api || "";
+
   const result: LlmConfig = {
     generatorKey: genCfg.apiKey || process.env.ACEFORGE_GENERATOR_API_KEY || "",
-    generatorUrl: (genCfg.baseURL || process.env.ACEFORGE_GENERATOR_URL || genDef.url).replace(/\/$/, ""),
+    // Fix: read both baseUrl (OpenClaw convention) and baseURL (legacy) for compatibility
+    generatorUrl: (genCfg.baseUrl || genCfg.baseURL || process.env.ACEFORGE_GENERATOR_URL || genDef.url).replace(/\/$/, ""),
     generatorModel: process.env.ACEFORGE_GENERATOR_MODEL || genDef.model,
     generatorProvider: genProvider,
+    generatorApiFormat: genApiField.includes("anthropic") ? "anthropic" : "openai",
     reviewerKey: revCfg.apiKey || process.env.ACEFORGE_REVIEWER_API_KEY || "",
-    reviewerUrl: (revCfg.baseURL || process.env.ACEFORGE_REVIEWER_URL || revDef.url).replace(/\/$/, ""),
+    reviewerUrl: (revCfg.baseUrl || revCfg.baseURL || process.env.ACEFORGE_REVIEWER_URL || revDef.url).replace(/\/$/, ""),
     reviewerModel: process.env.ACEFORGE_REVIEWER_MODEL || revDef.model,
     reviewerProvider: revProvider,
+    reviewerApiFormat: revApiField.includes("anthropic") ? "anthropic" : "openai",
   };
 
   _configCache = { config: result, ts: Date.now() };
@@ -307,65 +325,127 @@ ${generatedMd}`;
 
 // ─── API callers (rate-limited) ─────────────────────────────────
 
-async function callGenerator(url: string, apiKey: string, model: string, brief: string): Promise<string> {
-  const res = await rateLimitedFetch(`${url}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: "You are an expert at writing OpenClaw SKILL.md files. You produce concise, actionable skill documents." },
-        { role: "user", content: brief }
-      ],
-      temperature: 0.3,
-      max_tokens: 4096,
-    }),
-  });
+async function callGenerator(url: string, apiKey: string, model: string, brief: string, apiFormat: "openai" | "anthropic" = "openai"): Promise<string> {
+  const systemPrompt = "You are an expert at writing OpenClaw SKILL.md files. You produce concise, actionable skill documents.";
+
+  let res: Response;
+  if (apiFormat === "anthropic") {
+    // Anthropic Messages API: /v1/messages, x-api-key header, system as top-level field
+    res = await rateLimitedFetch(`${url}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        system: systemPrompt,
+        messages: [{ role: "user", content: brief }],
+        temperature: 0.3,
+        max_tokens: 4096,
+      }),
+    });
+  } else {
+    // OpenAI-compatible: /chat/completions, Bearer auth, system in messages
+    res = await rateLimitedFetch(`${url}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: brief }
+        ],
+        temperature: 0.3,
+        max_tokens: 4096,
+      }),
+    });
+  }
+
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     throw new Error(`Generator API ${res.status}: ${errText.slice(0, 200)}`);
   }
-  let data: { choices?: Array<{ message?: { content?: string } }> };
+
+  let data: any;
   try {
     data = await res.json();
   } catch (parseErr) {
     const preview = await res.text().catch(() => "(unreadable)");
     throw new Error(`Generator returned malformed JSON: ${preview.slice(0, 100)}`);
   }
-  let content = data.choices?.[0]?.message?.content;
+
+  // Parse response based on format
+  let content: string | undefined;
+  if (apiFormat === "anthropic") {
+    // Anthropic: { content: [{ type: "text", text: "..." }] }
+    content = data.content?.find((b: any) => b.type === "text")?.text;
+  } else {
+    // OpenAI: { choices: [{ message: { content: "..." } }] }
+    content = data.choices?.[0]?.message?.content;
+  }
   if (!content) throw new Error("Generator returned empty response");
   // Strip CoT reasoning blocks (DeepSeek Reasoner, other CoT models)
   content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   return content;
 }
 
-async function callReviewer(url: string, apiKey: string, model: string, reviewPrompt: string): Promise<{ verdict: string; reasoning?: string }> {
-  const res = await rateLimitedFetch(`${url}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: "user", content: reviewPrompt }],
-      stream: false,
-    }),
-  });
+async function callReviewer(url: string, apiKey: string, model: string, reviewPrompt: string, apiFormat: "openai" | "anthropic" = "openai"): Promise<{ verdict: string; reasoning?: string }> {
+  let res: Response;
+  if (apiFormat === "anthropic") {
+    res = await rateLimitedFetch(`${url}/v1/messages`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: reviewPrompt }],
+        max_tokens: 4096,
+      }),
+    });
+  } else {
+    res = await rateLimitedFetch(`${url}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: reviewPrompt }],
+        stream: false,
+      }),
+    });
+  }
+
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     throw new Error(`Reviewer API ${res.status}: ${errText.slice(0, 200)}`);
   }
-  let data: { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> };
+
+  let data: any;
   try {
     data = await res.json();
   } catch (parseErr) {
     const preview = await res.text().catch(() => "(unreadable)");
     throw new Error(`Reviewer returned malformed JSON: ${preview.slice(0, 100)}`);
   }
-  const msg = data.choices?.[0]?.message;
-  if (!msg?.content) throw new Error("Reviewer returned empty response");
-  if (msg.reasoning_content) {
-    console.log(`[aceforge/review] Reviewer CoT: ${msg.reasoning_content.slice(0, 100)}...`);
+
+  let verdict: string | undefined;
+  let reasoning: string | undefined;
+  if (apiFormat === "anthropic") {
+    verdict = data.content?.find((b: any) => b.type === "text")?.text;
+  } else {
+    const msg = data.choices?.[0]?.message;
+    verdict = msg?.content;
+    reasoning = msg?.reasoning_content;
+    if (reasoning) {
+      console.log(`[aceforge/review] Reviewer CoT: ${reasoning.slice(0, 100)}...`);
+    }
   }
-  return { verdict: msg.content!, reasoning: msg.reasoning_content };
+  if (!verdict) throw new Error("Reviewer returned empty response");
+  return { verdict, reasoning };
 }
 
 // ─── Frontmatter fixer ──────────────────────────────────────────
@@ -437,7 +517,7 @@ export async function generateSkillWithLLm(candidate: Candidate): Promise<Genera
 
   let generatedMd: string;
   try {
-    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief);
+    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief, config.generatorApiFormat);
     console.log(`[aceforge/llm-gen] Generator produced ${generatedMd.length} chars`);
     if (generatedMd.length > 50000) {
       console.error("[aceforge/llm-gen] LLM output exceeds 50KB safety limit");
@@ -454,7 +534,7 @@ export async function generateSkillWithLLm(candidate: Candidate): Promise<Genera
   if (config.reviewerKey) {
     try {
       const reviewPrompt = buildReviewPrompt(generatedMd);
-      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, reviewPrompt);
+      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, reviewPrompt, config.reviewerApiFormat);
       const firstLine = review.verdict.trim().split("\n")[0].toUpperCase();
       if (firstLine.startsWith("APPROVE")) verdict = "APPROVE";
       else if (firstLine.startsWith("REVISE")) { verdict = "REVISE"; feedback = review.verdict.trim().slice(firstLine.length).trim(); }
@@ -469,12 +549,12 @@ export async function generateSkillWithLLm(candidate: Candidate): Promise<Genera
   if (verdict === "REVISE" && feedback) {
     try {
       const retryPrompt = `${brief}\n\n---\n\nPrevious generation was rated REVISE:\n\n${feedback}\n\nRegenerate the SKILL.md addressing this feedback. Output ONLY the raw SKILL.md content. No markdown fences.`;
-      generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, retryPrompt);
+      generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, retryPrompt, config.generatorApiFormat);
       console.log(`[aceforge/llm-gen] Retry generated ${generatedMd.length} chars`);
 
       try {
         const retryReviewPrompt = buildReviewPrompt(generatedMd);
-        const retryReview = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, retryReviewPrompt);
+        const retryReview = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, retryReviewPrompt, config.reviewerApiFormat);
         const retryLine = retryReview.verdict.trim().split("\n")[0].toUpperCase();
         if (retryLine.startsWith("APPROVE")) { verdict = "APPROVE"; }
         else if (retryLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = retryReview.verdict.trim(); }
@@ -505,7 +585,7 @@ export async function callGeneratorRaw(prompt: string): Promise<string | null> {
     return null;
   }
   try {
-    return await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, prompt);
+    return await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, prompt, config.generatorApiFormat);
   } catch (err) {
     console.error(`[aceforge] evolution generator error: ${(err as Error).message}`);
     return null;
@@ -552,7 +632,7 @@ Output ONLY the complete revised SKILL.md content. No markdown fences, no preamb
 
   let generatedMd: string;
   try {
-    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, revisionBrief);
+    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, revisionBrief, config.generatorApiFormat);
     console.log(`[aceforge/llm-gen] Revision generated ${generatedMd.length} chars`);
   } catch (err) {
     console.error(`[aceforge/llm-gen] Revision failed: ${(err as Error).message}`);
@@ -622,7 +702,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
 
   let generatedMd: string;
   try {
-    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief);
+    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief, config.generatorApiFormat);
   } catch (err) {
     console.error(`[aceforge/llm-gen] Workflow generation failed: ${(err as Error).message}`);
     return null;
@@ -687,7 +767,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
 
   let generatedMd: string;
   try {
-    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief);
+    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief, config.generatorApiFormat);
   } catch (err) {
     console.error(`[aceforge/llm-gen] Remediation generation failed: ${(err as Error).message}`);
     return null;
@@ -764,7 +844,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
 
   let generatedMd: string;
   try {
-    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief);
+    generatedMd = await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, brief, config.generatorApiFormat);
     if (generatedMd.length > 50000) {
       console.error("[aceforge/llm-gen] Upgrade output exceeds 50KB safety limit");
       return null;
