@@ -646,17 +646,11 @@ Every major design decision in AceForge is grounded in peer-reviewed research. T
 
 ---
 
-## What AceForge Is (and Isn't)
+## What AceForge Is
 
 AceForge is a **skill engine**. It generates, validates, and manages SKILL.md files — the permanent, auditable, shareable artifacts that teach your agent how to do things.
 
-It is **not** a memory system, a prompt optimizer, or an RL trainer. Those are different tools that solve different problems, and AceForge works alongside them:
-
-- **Want per-turn memory?** Use [Self-Evolve](https://github.com/longmans/self-evolve) — it injects episodic memories into every prompt.
-- **Want system prompt evolution?** Use [EvolveClaw](https://github.com/JarvisPei/EvolveClaw) — it synthesizes behavioral guidelines from your interactions.
-- **Want model weight training?** Use [OpenClaw-RL](https://github.com/Gen-Verse/OpenClaw-RL) — it trains the underlying model via reinforcement learning.
-
-AceForge produces the thing none of them do: **validated SKILL.md files** that survive restarts, work across agents, and can be published to ClawHub.
+It is not a memory system, a prompt optimizer, or an RL trainer. AceForge produces one thing: **validated SKILL.md files** that survive restarts, work across agents, and can be published to ClawHub.
 
 ---
 
