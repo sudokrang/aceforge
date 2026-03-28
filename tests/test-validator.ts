@@ -977,8 +977,139 @@ Use this bot: 123456789:ABCdefGHIjklMNOpqrSTUvwxyz_12345678
 // SUMMARY
 // ═══════════════════════════════════════════════════════════════════
 
+// v0.9.0 — Evolution Engine Module Imports
+// ═══════════════════════════════════════════════════════════════════
+
+section("v0.9.0: Evolution — Distill Module Import");
+{
+  try {
+    const mod = await import("../src/evolution/distill.js");
+    assert(typeof mod.checkMilestone === "function", "checkMilestone is exported");
+    assert(typeof mod.distillNewTraces === "function", "distillNewTraces is exported");
+    assert(typeof mod.recordDistillation === "function", "recordDistillation is exported");
+    assert(typeof mod.formatDistillationNotification === "function", "formatDistillationNotification is exported");
+    assert(typeof mod.formatDistillationReport === "function", "formatDistillationReport is exported");
+    assert(Array.isArray(mod.DISTILL_MILESTONES), "DISTILL_MILESTONES is exported array");
+    assert(mod.DISTILL_MILESTONES.length === 3, "3 milestones defined (500/2000/5000)");
+    assert(mod.DISTILL_MILESTONES[0] === 500, "First milestone is 500");
+    assert(mod.DISTILL_MILESTONES[1] === 2000, "Second milestone is 2000");
+    assert(mod.DISTILL_MILESTONES[2] === 5000, "Third milestone is 5000");
+
+    // Milestone check with 0 activations → no hit
+    const noHit = mod.checkMilestone("test-nonexistent", 0);
+    assert(!noHit.hit, "0 activations → no milestone hit");
+    assert(noHit.milestone === null, "0 activations → null milestone");
+
+    // Milestone check with 600 activations → hits 500
+    const hit500 = mod.checkMilestone("test-nonexistent", 600);
+    assert(hit500.hit, "600 activations → milestone hit");
+    assert(hit500.milestone === 500, "600 activations → milestone 500");
+    assert(!hit500.alreadyDistilled, "Non-existent skill → not distilled");
+
+    // Milestone check with 3000 → hits 2000
+    const hit2k = mod.checkMilestone("test-nonexistent", 3000);
+    assert(hit2k.milestone === 2000, "3000 activations → milestone 2000");
+
+    // Milestone check with 10000 → hits 5000
+    const hit5k = mod.checkMilestone("test-nonexistent", 10000);
+    assert(hit5k.milestone === 5000, "10000 activations → milestone 5000");
+
+    // distillNewTraces for non-existent skill → null
+    const noDistill = mod.distillNewTraces("test-nonexistent", 500);
+    assert(noDistill === null, "Non-existent skill → null distillation");
+  } catch (err) {
+    assert(false, "Distill module import failed: " + (err as Error).message);
+  }
+}
+
+section("v0.9.0: Evolution — Novel Capture Module Import");
+{
+  try {
+    const mod = await import("../src/evolution/capture-novel.js");
+    assert(typeof mod.checkNovelSuccess === "function", "checkNovelSuccess is exported");
+    assert(typeof mod.recordCapture === "function", "recordCapture is exported");
+    assert(typeof mod.promoteCapture === "function", "promoteCapture is exported");
+    assert(typeof mod.dismissCapture === "function", "dismissCapture is exported");
+    assert(typeof mod.listCaptures === "function", "listCaptures is exported");
+    assert(typeof mod.formatCapturesReport === "function", "formatCapturesReport is exported");
+
+    // Blocklisted tool → not novel
+    const blocklisted = mod.checkNovelSuccess("forge", null, "some result text here", true);
+    assert(!blocklisted.novel, "Blocklisted tool → not novel");
+    assert(blocklisted.reason === "blocklisted_aceforge", "Reason is blocklisted_aceforge");
+
+    // Native tool → not novel
+    const native = mod.checkNovelSuccess("exec", null, "result text here long enough", true);
+    assert(!native.novel, "Native tool → not novel");
+    assert(native.reason === "blocklisted_native", "Reason is blocklisted_native");
+
+    // Failed call → not novel
+    const failed = mod.checkNovelSuccess("some_new_tool", null, "result", false);
+    assert(!failed.novel, "Failed call → not novel");
+    assert(failed.reason === "not_success", "Reason is not_success");
+
+    // Trivial result → not novel
+    const trivial = mod.checkNovelSuccess("some_new_tool", null, "ok", true);
+    assert(!trivial.novel, "Trivial result → not novel");
+    assert(trivial.reason === "trivial_result", "Reason is trivial_result");
+
+    // Empty captures list
+    const captures = mod.listCaptures();
+    assert(Array.isArray(captures), "listCaptures returns array");
+
+    // Format captures report (empty state)
+    const report = mod.formatCapturesReport();
+    assert(report.includes("No captured"), "Empty captures report");
+  } catch (err) {
+    assert(false, "Capture-novel module import failed: " + (err as Error).message);
+  }
+}
+
+section("v0.9.0: Evolution — Evolve Command Module Import");
+{
+  try {
+    const mod = await import("../src/evolution/evolve-command.js");
+    assert(typeof mod.executeEvolve === "function", "executeEvolve is exported");
+    assert(typeof mod.generateUnifiedDiff === "function", "generateUnifiedDiff is exported");
+    assert(typeof mod.formatEvolveResult === "function", "formatEvolveResult is exported");
+    assert(typeof mod.formatDiffForDisplay === "function", "formatDiffForDisplay is exported");
+
+    // Unified diff — identical texts → empty
+    const noDiff = mod.generateUnifiedDiff("hello\nworld", "hello\nworld", "a", "b");
+    assert(noDiff === "", "Identical texts → empty diff");
+
+    // Unified diff — simple change
+    const simpleDiff = mod.generateUnifiedDiff("hello\nworld", "hello\nearth", "a", "b");
+    assert(simpleDiff.includes("---"), "Diff has old file header");
+    assert(simpleDiff.includes("+++"), "Diff has new file header");
+    assert(simpleDiff.includes("-world"), "Diff shows deletion");
+    assert(simpleDiff.includes("+earth"), "Diff shows addition");
+
+    // Unified diff — multi-line with context
+    const multiDiff = mod.generateUnifiedDiff(
+      "line1\nline2\nline3\nline4\nline5",
+      "line1\nline2\nchanged\nline4\nline5",
+      "old", "new"
+    );
+    assert(multiDiff.includes("@@"), "Diff has hunk header");
+    assert(multiDiff.includes("-line3"), "Diff shows old line");
+    assert(multiDiff.includes("+changed"), "Diff shows new line");
+
+    // executeEvolve for non-existent skill → error
+    const noSkill = await mod.executeEvolve("totally-nonexistent-skill");
+    assert(!noSkill.success, "Non-existent skill → failure");
+    assert(noSkill.error && noSkill.error.includes("not found"), "Error mentions not found");
+
+    // formatEvolveResult for error
+    const errResult = mod.formatEvolveResult({ success: false, error: "test error" });
+    assert(errResult.includes("test error"), "Error result formatted");
+  } catch (err) {
+    assert(false, "Evolve command module import failed: " + (err as Error).message);
+  }
+}
+
 console.log(`\n${"═".repeat(60)}`);
-console.log(`AceForge v0.8.2 Test Results: ${passed} passed, ${failed} failed`);
+console.log(`AceForge v0.9.0 Test Results: ${passed} passed, ${failed} failed`);
 if (failures.length > 0) {
   console.log(`\nFailures:`);
   for (const f of failures) console.log(`  ❌ ${f}`);
@@ -986,3 +1117,6 @@ if (failures.length > 0) {
 console.log(`${"═".repeat(60)}\n`);
 
 process.exit(failed > 0 ? 1 : 0);
+
+
+// ═══════════════════════════════════════════════════════════════════

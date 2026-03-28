@@ -493,6 +493,25 @@ export async function generateSkillWithLLm(candidate: Candidate): Promise<Genera
   return { skillMd: fixFrontmatterNesting(generatedMd), verdict: verdict as any, feedback, usedLlm: true };
 }
 
+/**
+ * v0.9.0: Raw generator call for evolution prompts.
+ * Takes a plain string prompt, returns raw LLM response text.
+ * Used by /forge evolve to send distillation deltas to the generator.
+ */
+export async function callGeneratorRaw(prompt: string): Promise<string | null> {
+  const config = loadLlmConfig();
+  if (!config.generatorKey) {
+    console.warn("[aceforge] no generator API key configured — evolution requires LLM");
+    return null;
+  }
+  try {
+    return await callGenerator(config.generatorUrl, config.generatorKey, config.generatorModel, prompt);
+  } catch (err) {
+    console.error(`[aceforge] evolution generator error: ${(err as Error).message}`);
+    return null;
+  }
+}
+
 export async function reviseSkillWithLLm(
   candidate: Candidate,
   existingSkillMd: string,

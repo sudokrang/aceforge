@@ -19,6 +19,8 @@ import {
   getSkillStats,
 } from "../skill/lifecycle.js";
 import { notify } from "../notify.js";
+import { checkMilestone, distillNewTraces, recordDistillation, formatDistillationNotification } from "../evolution/distill.js";
+import { checkNovelSuccess, recordCapture } from "../evolution/capture-novel.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
 
@@ -251,11 +253,48 @@ export function captureToolTrace(event: any, ctx: any, api?: any): void {
           checkAndTriggerRevision(matchedSkill);
         }
 
+        // ── v0.9.0: Milestone distillation check ────────────────────
+        const msCheck = checkMilestone(matchedSkill, stats.activations);
+        if (msCheck.hit && !msCheck.alreadyDistilled && msCheck.milestone) {
+          try {
+            const report = distillNewTraces(matchedSkill, msCheck.milestone);
+            if (report) {
+              recordDistillation(matchedSkill, msCheck.milestone, report.meaningful);
+              if (report.meaningful) {
+                notify(formatDistillationNotification(report)).catch(err =>
+                  console.error("[aceforge] distill notify error:", (err as Error).message)
+                );
+              }
+              console.log(`[aceforge] distillation at ${msCheck.milestone} for ${matchedSkill}: ${report.meaningful ? "meaningful" : "no action"}`);
+            }
+          } catch (distillErr) {
+            console.error(`[aceforge] milestone distill error: ${(distillErr as Error).message}`);
+          }
+        }
+
         if (api?.logger) {
           api.logger.info(`[aceforge] skill activation: ${matchedSkill} (via ${ev.toolName})`);
         }
       } else {
         recordActivation(`_unmanaged:${ev.toolName}`, !ev?.error);
+
+        // ── v0.9.0: Novel one-shot success capture ──────────────────
+        const novelCheck = checkNovelSuccess(
+          ev.toolName,
+          ev?.params ? JSON.stringify(ev.params).slice(0, 100) : null,
+          ev?.result != null ? JSON.stringify(ev.result).slice(0, 200) : null,
+          !ev?.error,
+        );
+        if (novelCheck.novel) {
+          recordCapture(
+            ev.toolName,
+            ev?.params ? JSON.stringify(ev.params).slice(0, 100) : null,
+            ev?.result != null ? JSON.stringify(ev.result).slice(0, 200) : null,
+            cx?.sessionKey ?? null,
+            novelCheck.reason,
+          );
+          console.log(`[aceforge] novel capture: ${ev.toolName}`);
+        }
       }
     }
   } catch (err) {

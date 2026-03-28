@@ -1,6 +1,6 @@
 /**
  * AceForge — Self-Evolving Skill Engine for OpenClaw
- * v0.8.2: Argument-pattern clustering for native tools — replaced 20 commands with subcommand dispatch — C1/H1/H2/H3/H4/H5/M7 applied
+ * v0.9.0: Evolution engine — trace distillation, novel capture, /forge evolve — replaced 20 commands with subcommand dispatch — C1/H1/H2/H3/H4/H5/M7 applied
  *
  * Phase 1: Core engine (v0.1–v0.6.1) — pattern detection, skill crystallization, lifecycle
  * Phase 2: Proactive intelligence — capability tree, cross-session propagation, composition,
@@ -56,6 +56,11 @@ import { recordRevision, formatHistoryTimeline, formatDiff as formatSkillDiff } 
 import { runAllHealthTests, formatHealthTestReport } from "./src/validation/health-test.js";
 import { generateChallenges, formatChallengeReport } from "./src/validation/grounded-challenges.js";
 import { runAdversarialTests, formatAdversarialReport } from "./src/validation/adversarial.js";
+
+// ─── Phase 4 imports (v0.9.0 Evolution Engine) ─────────────────────────────────
+import { distillNewTraces, formatDistillationReport, formatDistillationNotification } from "./src/evolution/distill.js";
+import { promoteCapture, dismissCapture, formatCapturesReport } from "./src/evolution/capture-novel.js";
+import { executeEvolve, formatEvolveResult } from "./src/evolution/evolve-command.js";
 
 // ─── Paths ────────────────────────────────────────────────────────────────
 const HOME = os.homedir() || process.env.HOME || "";
@@ -822,6 +827,50 @@ function buildPlugin() {
             case "adversarial":
               return { text: formatAdversarialReport() };
 
+            // ── Phase 4: Evolution (v0.9.0) ──
+            case "evolve": {
+              if (!subArgs) return { text: "Usage: /forge evolve <skill-name>\nTriggers trace distillation + LLM revision with unified diff." };
+              const evolveResult = await executeEvolve(subArgs, async (prompt: string) => {
+                try {
+                  const { callGeneratorRaw } = await import("./src/skill/llm-generator.js");
+                  return await callGeneratorRaw(prompt);
+                } catch { return null; }
+              });
+              return { text: formatEvolveResult(evolveResult) };
+            }
+            case "distill": {
+              if (!subArgs) return { text: "Usage: /forge distill <skill-name>\nRuns SRLR trace distillation without LLM revision." };
+              const healthFile2 = path.join(FORGE_DIR, "skill-health.jsonl");
+              let distillActivations = 0;
+              if (fs.existsSync(healthFile2)) {
+                const dLines = fs.readFileSync(healthFile2, "utf-8").split("\n").filter((l: string) => l.trim());
+                for (const dl of dLines) {
+                  try { const de = JSON.parse(dl); if (de.skill === subArgs && de.action === "activation") distillActivations++; } catch { /* skip */ }
+                }
+              }
+              const distillReport = distillNewTraces(subArgs, Math.max(50, distillActivations));
+              if (!distillReport) return { text: `No trace data available for '${subArgs}'.` };
+              return { text: formatDistillationReport(distillReport) };
+            }
+            case "captures":
+              return { text: formatCapturesReport() };
+            case "capture": {
+              if (!subArgs) return { text: "Usage: /forge capture promote|dismiss <tool>" };
+              const capParts = subArgs.split(/\s+/);
+              const capAction = capParts[0];
+              const capTool = capParts.slice(1).join(" ");
+              if (!capTool) return { text: "Usage: /forge capture promote|dismiss <tool>" };
+              if (capAction === "promote") {
+                const promoted = promoteCapture(capTool);
+                return { text: promoted ? `Capture '${capTool}' promoted — included in next crystallization cycle.` : `No pending capture for '${capTool}'.` };
+              }
+              if (capAction === "dismiss") {
+                const dismissed = dismissCapture(capTool);
+                return { text: dismissed ? `Capture '${capTool}' dismissed.` : `No pending capture for '${capTool}'.` };
+              }
+              return { text: "Unknown capture action. Use: promote or dismiss" };
+            }
+
             // ── Preview: human-readable skill brief for non-technical users ──
             case "preview": {
               if (!subArgs) return { text: "Usage: /forge preview <name>" };
@@ -1124,7 +1173,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.8.2 — all hooks, tools, and commands registered ");
+      log.info("[aceforge] v0.9.0 — all hooks, tools, commands, and evolution engine registered ");
     }
   };
 }
