@@ -189,25 +189,124 @@ export async function proposeCompositionSkills(): Promise<number> {
     const skillDir = path.join(HOME, ".openclaw", "workspace", "skills", proposalName);
     if (fsSync.existsSync(skillDir)) continue;
 
-    // Build a ChainCandidate-compatible structure from co-activation data
+    // Resolve tool names from skill names
+    const toolNames = candidate.skills.map(s =>
+      s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "")
+    );
+
+    // Populate sampleTraces from patterns.jsonl — find sessions where
+    // both tools were used, then extract the actual trace data
+    const sampleTraces: Array<{ tool: string; args_summary?: string; result_summary?: string; success: boolean; error?: string }[]> = [];
+    const patternsFile = path.join(FORGE_DIR, "patterns.jsonl");
+    if (fsSync.existsSync(patternsFile)) {
+      const pContent = fsSync.readFileSync(patternsFile, "utf-8");
+      const lines = pContent.split("\n").filter(l => l.trim());
+
+      // Group traces by session
+      const sessionTraces = new Map<string, Array<{ tool: string; args_summary: string; result_summary: string; success: boolean; error?: string; ts: string }>>();
+      for (const line of lines) {
+        try {
+          const e = JSON.parse(line);
+          if (!e.session || !e.tool || e.type === "chain" || e.type === "correction") continue;
+          if (!toolNames.includes(e.tool)) continue;
+          if (!sessionTraces.has(e.session)) sessionTraces.set(e.session, []);
+          sessionTraces.get(e.session)!.push({
+            tool: e.tool,
+            args_summary: (e.args_summary || "").slice(0, 100),
+            result_summary: ((e.result_summary as string) || "").slice(0, 100),
+            success: !!e.success,
+            error: e.error ? String(e.error).slice(0, 80) : undefined,
+            ts: e.ts,
+          });
+        } catch { /* skip */ }
+      }
+
+      // Find sessions with both tools present → build sample executions
+      for (const [, traces] of sessionTraces) {
+        if (sampleTraces.length >= 3) break; // max 3 samples
+        const toolsPresent = new Set(traces.map(t => t.tool));
+        if (toolNames.every(t => toolsPresent.has(t))) {
+          // Pick one trace per tool, sorted by timestamp
+          const execution = toolNames
+            .map(t => traces.filter(tr => tr.tool === t).sort((a, b) => a.ts.localeCompare(b.ts))[0])
+            .filter(Boolean)
+            .map(({ ts, ...rest }) => rest); // strip ts from output
+          if (execution.length === toolNames.length) {
+            sampleTraces.push(execution);
+          }
+        }
+      }
+    }
+
     const chainCandidate = {
-      toolSequence: candidate.skills.map(s =>
-        s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "")
-      ),
+      toolSequence: toolNames,
       occurrences: candidate.sessionsObserved,
       successRate: candidate.coActivationRate,
       distinctSessions: candidate.sessionsObserved,
-      sampleTraces: [] as Array<{ tool: string; args_summary?: string; result_summary?: string; success: boolean; error?: string }[]>,
+      sampleTraces,
     };
 
     try {
-      const result = await generateWorkflowSkillWithLLm(chainCandidate);
-      if (!result || result.verdict === "REJECT") continue;
+      let skillMd: string;
+      const llmResult = await generateWorkflowSkillWithLLm(chainCandidate);
 
-      const validation = validateSkillMd(result.skillMd, proposalName);
+      if (llmResult && llmResult.verdict !== "REJECT") {
+        skillMd = llmResult.skillMd;
+      } else {
+        // Template fallback — generate a basic workflow skill without LLM
+        const stepsSection = chainCandidate.toolSequence
+          .map((t, i) => `${i + 1}. Run \`${t}\` with appropriate arguments`)
+          .join("\n");
+        const sampleSection = sampleTraces.length > 0
+          ? "\n## Observed Patterns\n\n" + sampleTraces.slice(0, 2).map((exec, i) =>
+              `### Execution ${i + 1}\n` + exec.map(s =>
+                `- \`${s.tool}\`: ${s.args_summary || "(no args)"} → ${s.success ? "OK" : "FAIL"}`
+              ).join("\n")
+            ).join("\n\n")
+          : "";
+        skillMd = [
+          "---",
+          `name: ${proposalName}`,
+          `description: "Workflow combining ${candidate.skills.join(" + ")} (${candidate.sessionsObserved} co-activations, ${Math.round(candidate.coActivationRate * 100)}% rate)"`,
+          "metadata:",
+          "  openclaw:",
+          "    category: workflow",
+          "    aceforge:",
+          "      status: proposed",
+          `      proposed: ${new Date().toISOString()}`,
+          "      auto_generated: true",
+          "      source: composition",
+          "---",
+          "",
+          `# ${proposalName}`,
+          "",
+          "## When to Use",
+          "",
+          `Use when you need both ${candidate.skills.join(" and ")} in the same task.`,
+          `These skills co-activate in ${Math.round(candidate.coActivationRate * 100)}% of sessions where either appears.`,
+          "",
+          "## Instructions",
+          "",
+          stepsSection,
+          "",
+          "## Error Recovery",
+          "",
+          "- If any step fails, do NOT proceed to the next step",
+          "- Report the failing step and its error to the user",
+          sampleSection,
+          "",
+          "## Anti-Patterns",
+          "",
+          "- Do NOT use if only one of the tools is needed",
+          "- Do NOT use if the tools serve unrelated purposes in this session",
+        ].join("\n");
+        console.log(`[aceforge] composition template fallback: ${proposalName}`);
+      }
+
+      const validation = validateSkillMd(skillMd, proposalName);
       if (validation.errors.some((e: string) => e.startsWith("BLOCKED:"))) continue;
 
-      writeProposal(proposalName, result.skillMd);
+      writeProposal(proposalName, skillMd);
       appendJsonl("candidates.jsonl", {
         ts: new Date().toISOString(),
         tool: candidate.skills.join("+"),
