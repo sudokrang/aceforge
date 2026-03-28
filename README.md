@@ -2,6 +2,12 @@
   <img src="assets/banner.svg" alt="AceForge" width="100%">
 </p>
 
+> **Your agent keeps doing the same things. AceForge turns those patterns into permanent skills.**
+>
+> It watches what tools your agent calls, what fails, and what you correct — then proposes
+> validated, human-approved skills so your agent never has to figure it out from scratch again.
+> Nothing deploys without your say-so.
+
 <p align="center">
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
   <a href="https://openclaw.ai"><img src="https://img.shields.io/badge/OpenClaw-Plugin-orange" alt="OpenClaw Plugin"></a>
@@ -637,6 +643,20 @@ Every major design decision in AceForge is grounded in peer-reviewed research. T
 | Autonomous experiential learning | [SEAgent](https://arxiv.org/abs/2508.04700) (Aug 2025) | Specialist-to-generalist training; curriculum-based task generation |
 
 </details>
+
+---
+
+## What AceForge Is (and Isn't)
+
+AceForge is a **skill engine**. It generates, validates, and manages SKILL.md files — the permanent, auditable, shareable artifacts that teach your agent how to do things.
+
+It is **not** a memory system, a prompt optimizer, or an RL trainer. Those are different tools that solve different problems, and AceForge works alongside them:
+
+- **Want per-turn memory?** Use [Self-Evolve](https://github.com/longmans/self-evolve) — it injects episodic memories into every prompt.
+- **Want system prompt evolution?** Use [EvolveClaw](https://github.com/JarvisPei/EvolveClaw) — it synthesizes behavioral guidelines from your interactions.
+- **Want model weight training?** Use [OpenClaw-RL](https://github.com/Gen-Verse/OpenClaw-RL) — it trains the underlying model via reinforcement learning.
+
+AceForge produces the thing none of them do: **validated SKILL.md files** that survive restarts, work across agents, and can be published to ClawHub.
 
 ---
 
