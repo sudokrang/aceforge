@@ -17,6 +17,10 @@ import { analyzePatterns } from "./src/pattern/analyze.js";
 import { buildHierarchicalSkillIndex } from "./src/skill/index.js";
 import { notify } from "./src/notify.js";
 import { bold, mono, metric, compose, actions as fmtActions } from "./src/notify-format.js";
+
+// Formatting helper for action notifications — module scope so validateAndDeploy can use it
+const _skillAction = (icon: string, verb: string, name: string): string =>
+  `${icon} ${bold(verb)}  ${mono(name)}`;
 import { resetLlmRateLimit } from "./src/skill/llm-generator.js";
 import {
   recordActivation,
@@ -577,10 +581,6 @@ function buildPlugin() {
           const spaceIdx = raw.indexOf(" ");
           const sub = spaceIdx === -1 ? raw.toLowerCase() : raw.slice(0, spaceIdx).toLowerCase();
           const subArgs = spaceIdx === -1 ? "" : raw.slice(spaceIdx + 1).trim();
-
-          // Formatting helper for action notifications (uses notify-format.ts)
-          const _skillAction = (icon: string, verb: string, name: string) =>
-            `${icon} ${bold(verb)}  ${mono(name)}`;
 
           switch (sub) {
             // ── No subcommand: dashboard ──
