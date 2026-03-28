@@ -418,12 +418,29 @@ Both generator and reviewer support OpenAI-compatible (`/chat/completions`) and 
 | **MiniMax** (default generator) | `https://api.minimax.io/v1` | M2.7 — strong structured output |
 | **DeepSeek** (default reviewer) | `https://api.deepseek.com` | Chat — structured rubric review |
 | **OpenAI** | `https://api.openai.com/v1` | GPT-4o or GPT-5.4 |
+| **Anthropic** | `https://api.anthropic.com` | Claude via `/v1/messages` — auto-detected |
 | **OpenRouter** | `https://openrouter.ai/api/v1` | Claude, Gemini, Llama, etc. |
-| **Local** (LM Studio, Ollama) | `http://127.0.0.1:1234/v1` | Fully offline |
+| **Together** | `https://api.together.xyz/v1` | Llama, Mixtral, open models |
+| **Groq** | `https://api.groq.com/openai/v1` | Fast inference — Llama, Gemma |
+| **Cerebras** | `https://api.cerebras.ai/v1` | Wafer-scale inference |
+| **Hugging Face** | `https://api-inference.huggingface.co/v1` | Any HF Inference model |
+| **Kimi** (Moonshot) | `https://api.moonshot.cn/v1` | Kimi K2.5 |
+| **Ollama** | `http://127.0.0.1:11434/v1` | Local — fully offline |
+| **LM Studio** | `http://127.0.0.1:1234/v1` | Local — fully offline |
+| **vLLM** | `http://127.0.0.1:8000/v1` | Local — high-throughput serving |
 
 ### Channel Agnostic
 
-Notifications work across all 25+ OpenClaw channels. Plain text with Unicode + emoji is the primary design target. Telegram and Slack get additional rich formatting (HTML / mrkdwn) as a polish layer.
+Notifications work across all 25+ OpenClaw channels. The formatting layer operates on **format types**, not channel names:
+
+| Format | Channels | Bold | Code |
+|---|---|---|---|
+| `html` | Telegram, email | `<b>` | `<code>` |
+| `mrkdwn` | Slack | `*single*` | `` ` `` |
+| `markdown` | Discord, Matrix | `**double**` | `` ` `` |
+| `plain` | Everything else | passthrough | passthrough |
+
+Plain text with Unicode + emoji is the primary design target — rich formatting is a polish layer. Adding a new channel: one line in `FORMAT_MAP`.
 
 ### OpenViking Compatible
 
@@ -464,6 +481,14 @@ export ACEFORGE_REVIEWER_MODEL=gpt-4o
 export ACEFORGE_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
+**Anthropic (Claude):**
+```bash
+export ACEFORGE_GENERATOR_PROVIDER=anthropic
+export ACEFORGE_GENERATOR_API_KEY=sk-ant-...
+export ACEFORGE_REVIEWER_PROVIDER=anthropic
+export ACEFORGE_REVIEWER_API_KEY=sk-ant-...
+```
+
 **Local models via LM Studio:**
 
 ```bash
@@ -495,7 +520,8 @@ export ACEFORGE_REVIEWER_API_KEY=not-needed
 ├── tests/
 │   └── test-validator.ts       # 412 assertions — validator, quality, adversarial, drift detection
 └── src/
-    ├── notify.ts               # Channel router (Telegram / Slack / log)
+    ├── notify.ts               # Transport layer (Telegram / Slack / log) + HTML sanitizer
+    ├── notify-format.ts        # FORMAT_MAP architecture — format types, not channel names
     ├── pattern/
     │   ├── constants.ts        # Canonical blocklists — TOOL, CAPTURE, NATIVE_TOOLS, SELF_TOOLS
     │   ├── store.ts            # JSONL with rotation (10K lines, 30 days, gzip)
