@@ -371,13 +371,12 @@ export async function analyzePatterns(): Promise<void> {
       : "";
 
     notify(
-      `New Skill Proposal\n` +
-      `${skillName}\n` +
-      `Tool: ${key}\n` +
-      `${entries.length}x, ${Math.round(successRate * 100)}% success, ${sessions.size} sessions\n` +
-      `Summary: ${summary}` +
-      notesSuffix + `\n` +
-      `Use: /forge approve ${skillName}  or  /forge reject ${skillName}`
+      `📋 ${bold("New Skill Proposal")}\n\n` +
+      `${bold(skillName)}\n` +
+      `Your agent used ${mono(key)} ${entries.length} times across ${sessions.size} session${sessions.size !== 1 ? "s" : ""} (${Math.round(successRate * 100)}% success)\n` +
+      (summary ? `\n${summary}` : "") +
+      (notesSuffix ? `\n${notesSuffix}` : "") + `\n\n` +
+      `${mono("/forge preview " + skillName)}\n${mono("/forge approve " + skillName)}\n${mono("/forge reject " + skillName)}`
     ).catch(err => console.error("[aceforge] notify error:", err));
   }
 
@@ -401,17 +400,19 @@ export async function analyzePatterns(): Promise<void> {
     const { runEffectivenessWatchdog } = await import("../skill/lifecycle.js");
     const watchdogAlerts = runEffectivenessWatchdog();
     if (watchdogAlerts.length > 0) {
-      const alertText = watchdogAlerts.map((a: any) =>
-        `${a.skill}: ${a.reason === "no_improvement"
-          ? `no improvement after ${a.activations} activations (${Math.round(a.successRate * 100)}% vs ${Math.round(a.baselineRate * 100)}% baseline)`
-          : `degraded to ${Math.round(a.successRate * 100)}% success over ${a.activations} activations`}`
-      ).join("\n");
-      console.warn(`[aceforge] watchdog alerts:\n${alertText}`);
+      const alertLines = watchdogAlerts.map((a: any) => {
+        if (a.reason === "no_improvement") {
+          return `${bold(a.skill)} hasn't improved after ${a.activations} uses — still at ${Math.round(a.successRate * 100)}% (was ${Math.round(a.baselineRate * 100)}% at deploy)`;
+        } else {
+          return `${bold(a.skill)} is declining — down to ${Math.round(a.successRate * 100)}% success over ${a.activations} uses`;
+        }
+      }).join("\n\n");
+      console.warn(`[aceforge] watchdog alerts:\n${alertLines}`);
       notify(
-        `Skill Effectiveness Alert\n` +
-        `${watchdogAlerts.length} skill(s) flagged for review:\n` +
-        alertText + `\n` +
-        `Consider: /forge retire <name> or wait for evolution cycle`
+        `📉 ${bold("Underperforming Skills")}\n\n` +
+        alertLines + `\n\n` +
+        `You can retire them or let the next evolution cycle attempt a fix:\n` +
+        mono("/forge retire <skill-name>")
       ).catch(err => console.error("[aceforge] notify error:", err));
     }
   } catch (err) {

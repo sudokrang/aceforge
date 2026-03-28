@@ -17,6 +17,7 @@
 import * as fsSync from "fs";
 import { appendJsonl } from "./store.js";
 import { notify } from "../notify.js";
+import { bold, mono } from "../notify-format.js";
 import { writeProposal } from "../skill/generator.js";
 import { validateSkillMd } from "../skill/validator.js";
 import { generateSkillWithLLm } from "../skill/llm-generator.js";
@@ -234,12 +235,11 @@ export async function handleNativeToolCandidate(
       const summary = descMatch ? descMatch[1].slice(0, 120) : canonicalName;
 
       notify(
-        `Native Tool Sub-Pattern Proposal\n` +
-        `${canonicalName}\n` +
-        `Tool: ${key} (${sp.domain} domain)\n` +
-        `${sp.entries.length}x, ${Math.round(spSuccessRate * 100)}% success, ${spSessions.size} sessions\n` +
-        `Summary: ${summary}\n` +
-        `Use: /forge approve ${canonicalName}  or  /forge reject ${canonicalName}`
+        `📋 ${bold("New Skill Proposal")}\n\n` +
+        `${bold(canonicalName)}\n` +
+        `Your agent ran ${mono(key)} in the ${sp.domain} domain ${sp.entries.length} times across ${spSessions.size} session${spSessions.size !== 1 ? "s" : ""} (${Math.round(spSuccessRate * 100)}% success)\n` +
+        (summary ? `\n${summary}` : "") + `\n\n` +
+        `${mono("/forge preview " + canonicalName)}\n${mono("/forge approve " + canonicalName)}\n${mono("/forge reject " + canonicalName)}`
       ).catch(err => console.error("[aceforge] notify error:", err));
 
       console.log(`[aceforge] sub-pattern proposal written: ${canonicalName}`);

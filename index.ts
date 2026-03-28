@@ -128,10 +128,11 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
       if (result.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
         fs.rmSync(path.join(SKILLS_DIR, skillName), { recursive: true, force: true });
         const blockReasons = result.errors.filter((e: string) => e.startsWith("BLOCKED:")).join("; ");
-        notify(`Blocked: ${skillName} — ${blockReasons}`);
+        notify(`🚫 ${bold("Skill blocked")}  ${mono(skillName)}\n\nFailed security validation — not deployed.\n${blockReasons.replace(/BLOCKED:\s*/g, "")}`);
         return { ok: false, message: `Skill '${skillName}' blocked by validator: ${blockReasons}` };
       }
-      notify(`Deploying ${skillName} with warnings: ${result.errors.join("; ")}`);
+      notify(`⚠️ ${bold("Deployed with warnings")}  ${mono(skillName)}\n\n${result.errors.join("\n")}`);
+
     }
   } catch (err) { fs.rmSync(path.join(SKILLS_DIR, skillName), { recursive: true, force: true }); return { ok: false, message: `Skill '${skillName}' rejected: validator failed to load — ${(err as Error).message}` }; }
 
@@ -695,7 +696,8 @@ function buildPlugin() {
                   if (valResult.errors.some((e: string) => e.startsWith("BLOCKED:"))) {
                     const blockReasons = valResult.errors.filter((e: string) => e.startsWith("BLOCKED:")).join("; ");
                     fs.rmSync(upgradeDir, { recursive: true, force: true });
-                    notify(`Upgrade blocked: ${upgradeName} — ${blockReasons}`);
+                    notify(`🚫 ${bold("Upgrade blocked")}  ${mono(upgradeName)}\n\nFailed security validation — old skill preserved.\n${blockReasons.replace(/BLOCKED:\s*/g, "")}`);
+
                     return { text: `Upgrade '${upgradeName}' blocked by validator: ${blockReasons}` };
                   }
                 }

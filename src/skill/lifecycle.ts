@@ -338,7 +338,7 @@ export function expireOldProposals(notifyFn?: (msg: string) => Promise<void>): v
     fsSync.rmSync(propDir, { recursive: true, force: true });
     console.log(`[aceforge] proposal expired: ${name}`);
     if (notifyFn) {
-      notifyFn(`Proposal expired: ${name}\nNo response in 7 days.`);
+      notifyFn(`🗑️ Proposal expired · ${name}\n\nNo action taken in 7 days — automatically removed.`);
     }
   }
 }
@@ -590,7 +590,7 @@ export function revalidateProposals(
       removed.push(name);
       console.log(`[aceforge] revalidation: removed '${name}' — targets native tool '${prefix}'`);
       if (notifyFn) {
-        notifyFn(`Proposal removed: ${name}\nReason: targets native OpenClaw tool '${prefix}'`);
+        notifyFn(`🧹 Stale proposal cleaned up · ${name}\n\n${prefix} is a built-in OpenClaw tool that doesn't need a skill.`);
       }
       continue;
     }
@@ -610,7 +610,7 @@ export function revalidateProposals(
         removed.push(name);
         console.log(`[aceforge] revalidation: removed '${name}' — duplicates deployed skill '${duplicateSkill}'`);
         if (notifyFn) {
-          notifyFn(`Proposal removed: ${name}\nReason: duplicates deployed skill '${duplicateSkill}'`);
+          notifyFn(`🧹 Stale proposal cleaned up · ${name}\n\nAlready covered by deployed skill ${duplicateSkill}.`);
         }
       }
     }
