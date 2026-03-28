@@ -2,7 +2,7 @@
   "id": "aceforge",
   "name": "AceForge",
   "description": "Self-evolving skill engine \u2014 detects patterns, crystallizes skills, manages lifecycle, proactive intelligence, self-validation",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "openclaw": {
     "extensions": [
       "./index.ts"
@@ -43,5 +43,119 @@
         "description": "Observation-only mode: log what would be proposed without writing skills to disk"
       }
     }
+  },
+  "hooks": [
+    "after_tool_call",
+    "llm_output",
+    "agent_end",
+    "before_prompt_build"
+  ],
+  "tools": [
+    "forge",
+    "forge_reflect",
+    "forge_propose",
+    "forge_approve_skill",
+    "forge_reject_skill",
+    "forge_quality",
+    "forge_registry",
+    "forge_rewards",
+    "forge_tree",
+    "forge_gaps"
+  ],
+  "commands": [
+    "/forge"
+  ],
+  "services": [
+    "aceforge-startup"
+  ],
+  "capabilities": {
+    "executesCode": false,
+    "readsConfig": true,
+    "writesWorkspace": true,
+    "networkAccess": "optional",
+    "description": "Reads openclaw.json for notification channel config. Writes to ~/.openclaw/workspace/.forge/ (trace data, proposals) and ~/.openclaw/workspace/skills/ (deployed skills). Optional outbound network: LLM API endpoints for skill generation/review, Telegram/Slack for notifications."
+  },
+  "envVars": {
+    "optional": [
+      {
+        "name": "ACEFORGE_GENERATOR_PROVIDER",
+        "description": "LLM provider for skill generation (default: minimax)"
+      },
+      {
+        "name": "ACEFORGE_GENERATOR_API_KEY",
+        "description": "API key for generator LLM"
+      },
+      {
+        "name": "ACEFORGE_GENERATOR_MODEL",
+        "description": "Model name for generator"
+      },
+      {
+        "name": "ACEFORGE_GENERATOR_URL",
+        "description": "Base URL for generator endpoint"
+      },
+      {
+        "name": "ACEFORGE_REVIEWER_PROVIDER",
+        "description": "LLM provider for skill review (default: deepseek)"
+      },
+      {
+        "name": "ACEFORGE_REVIEWER_API_KEY",
+        "description": "API key for reviewer LLM"
+      },
+      {
+        "name": "ACEFORGE_REVIEWER_MODEL",
+        "description": "Model name for reviewer"
+      },
+      {
+        "name": "ACEFORGE_REVIEWER_URL",
+        "description": "Base URL for reviewer endpoint"
+      },
+      {
+        "name": "ACEFORGE_NOTIFICATION_CHANNEL",
+        "description": "Force notification channel: telegram, slack, or log"
+      },
+      {
+        "name": "ACEFORGE_TELEGRAM_BOT_TOKEN",
+        "description": "Telegram bot token for notifications"
+      },
+      {
+        "name": "ACEFORGE_OWNER_CHAT_ID",
+        "description": "Telegram chat ID for notifications"
+      },
+      {
+        "name": "ACEFORGE_SLACK_WEBHOOK_URL",
+        "description": "Slack webhook URL for notifications"
+      },
+      {
+        "name": "ACEFORGE_VIKING_URL",
+        "description": "OpenViking URL for context-enriched challenges"
+      },
+      {
+        "name": "ACEFORGE_DRY_RUN",
+        "description": "Observation-only mode \u2014 log proposals without writing to disk"
+      },
+      {
+        "name": "ACEFORGE_SHARED_SKILLS",
+        "description": "Also deploy approved skills to ~/.openclaw/skills/ for multi-agent sharing"
+      },
+      {
+        "name": "ACEFORGE_NOTIFY_DIGEST",
+        "description": "Queue notifications during analysis and send as single digest"
+      }
+    ]
+  },
+  "configPaths": [
+    "~/.openclaw/openclaw.json",
+    "~/.openclaw/workspace/.forge/",
+    "~/.openclaw/workspace/skills/"
+  ],
+  "networkEndpoints": {
+    "description": "All outbound network is optional and user-configured. No hardcoded endpoints.",
+    "optional": [
+      "User-configured LLM API endpoint (generator)",
+      "User-configured LLM API endpoint (reviewer)",
+      "Telegram Bot API (if notification channel is telegram)",
+      "Slack Webhook (if notification channel is slack)",
+      "OpenViking (if configured for challenge generation)"
+    ]
   }
 }
