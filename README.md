@@ -24,6 +24,7 @@
 
 ## Table of Contents
 
+- [Design Philosophy](PHILOSOPHY.md)
 - [Why AceForge Exists](#why-aceforge-exists)
 - [How It Works](#how-it-works)
 - [Observation & Pattern Detection](#observation--pattern-detection)
@@ -465,6 +466,7 @@ AceForge is fully compatible with [OpenViking](https://github.com/volcengine/Ope
 | `ACEFORGE_SLACK_WEBHOOK_URL` | — | Slack incoming webhook |
 | `ACEFORGE_VIKING_URL` | `http://127.0.0.1:1933` | OpenViking URL (optional) |
 | `ACEFORGE_DRY_RUN` | `false` | Observation-only mode — log proposals without writing to disk |
+| `ACEFORGE_SHARED_SKILLS` | `false` | Deploy approved skills to `~/.openclaw/skills/` (shared across all agents) |
 
 </details>
 

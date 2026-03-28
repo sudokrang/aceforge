@@ -13,6 +13,12 @@ import * as os from "os";
 import * as fsSync from "fs";
 import * as path from "path";
 import { listActiveSkills } from "../skill/lifecycle.js";
+import { generateWorkflowSkillWithLLm } from "../skill/llm-generator.js";
+import { writeProposal } from "../skill/generator.js";
+import { validateSkillMd } from "../skill/validator.js";
+import { notify } from "../notify.js";
+import { bold, mono } from "../notify-format.js";
+import { appendJsonl } from "../pattern/store.js";
 
 const HOME = os.homedir() || process.env.HOME || "";
 const FORGE_DIR = path.join(HOME, ".openclaw", "workspace", ".forge");
@@ -161,6 +167,70 @@ export function getCompositionCandidates(): CompositionCandidate[] {
   }
 
   return candidates;
+}
+
+// ─── Composition Execution — Bridge to Workflow Generation ──────────────
+// Converts co-activation candidates into actual workflow skill proposals.
+// This bridges the detector (detectCoActivations) with the generator
+// (generateWorkflowSkillWithLLm) to close the composition loop.
+
+export async function proposeCompositionSkills(): Promise<number> {
+  const candidates = getCompositionCandidates();
+  if (candidates.length === 0) return 0;
+
+  let proposed = 0;
+
+  for (const candidate of candidates.slice(0, 3)) { // max 3 per cycle
+    const proposalName = candidate.name;
+
+    // Skip if already proposed or deployed
+    const proposalDir = path.join(FORGE_DIR, "proposals", proposalName);
+    if (fsSync.existsSync(proposalDir)) continue;
+    const skillDir = path.join(HOME, ".openclaw", "workspace", "skills", proposalName);
+    if (fsSync.existsSync(skillDir)) continue;
+
+    // Build a ChainCandidate-compatible structure from co-activation data
+    const chainCandidate = {
+      toolSequence: candidate.skills.map(s =>
+        s.replace(/-(guard|skill|v\d+|rev\d+|upgrade|operations|workflow).*$/, "")
+      ),
+      occurrences: candidate.sessionsObserved,
+      successRate: candidate.coActivationRate,
+      distinctSessions: candidate.sessionsObserved,
+      sampleTraces: [] as Array<{ tool: string; args_summary?: string; result_summary?: string; success: boolean; error?: string }[]>,
+    };
+
+    try {
+      const result = await generateWorkflowSkillWithLLm(chainCandidate);
+      if (!result || result.verdict === "REJECT") continue;
+
+      const validation = validateSkillMd(result.skillMd, proposalName);
+      if (validation.errors.some((e: string) => e.startsWith("BLOCKED:"))) continue;
+
+      writeProposal(proposalName, result.skillMd);
+      appendJsonl("candidates.jsonl", {
+        ts: new Date().toISOString(),
+        tool: candidate.skills.join("+"),
+        type: "composition",
+        occurrences: candidate.sessionsObserved,
+        coActivationRate: candidate.coActivationRate,
+      });
+
+      notify(
+        `📋 ${bold("Composition Skill Proposal")}\n\n` +
+        `${bold(proposalName)}\n` +
+        `${candidate.skills.join(" + ")} activate together ${Math.round(candidate.coActivationRate * 100)}% of sessions (${candidate.sessionsObserved} observed)\n\n` +
+        `${mono("/forge preview " + proposalName)}\n${mono("/forge approve " + proposalName)}`
+      ).catch(() => {});
+
+      proposed++;
+      console.log(`[aceforge] composition proposal: ${proposalName}`);
+    } catch (err) {
+      console.error(`[aceforge] composition generation error: ${(err as Error).message}`);
+    }
+  }
+
+  return proposed;
 }
 
 // ─── Format for Display ─────────────────────────────────────────────────

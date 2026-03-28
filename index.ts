@@ -50,7 +50,7 @@ import { NATIVE_TOOLS } from "./src/pattern/constants.js";
 // ─── Phase 2 imports ────────────────────────────────────────────────────
 import { buildCapabilityTree, formatCapabilityTree, getPriorityDomains } from "./src/intelligence/capability-tree.js";
 import { mergePatterns, formatCrossSessionReport, getCrossSessionCandidates } from "./src/intelligence/cross-session.js";
-import { formatCompositionReport } from "./src/intelligence/composition.js";
+import { formatCompositionReport, proposeCompositionSkills } from "./src/intelligence/composition.js";
 import { summarizeBehaviorGaps, formatBehaviorGapReport, updateTreeWithBehaviorGaps } from "./src/intelligence/proactive-gaps.js";
 import { formatOptimizationReport } from "./src/intelligence/description-optimizer.js";
 import { handleCorrectionForSkill } from "./src/intelligence/auto-adjust.js";
@@ -147,6 +147,21 @@ async function validateAndDeploy(skillName: string): Promise<{ ok: boolean; mess
     const deployedMd = fs.readFileSync(path.join(SKILLS_DIR, skillName, "SKILL.md"), "utf-8");
     recordRevision(skillName, deployedMd, "deploy", "Deployed via /forge approve");
   } catch { /* non-critical */ }
+
+  // Multi-agent: optionally deploy to shared skills directory too
+  if (process.env.ACEFORGE_SHARED_SKILLS === "true") {
+    const sharedDir = path.join(HOME, ".openclaw", "skills", skillName);
+    try {
+      fs.mkdirSync(sharedDir, { recursive: true });
+      const skillFiles = fs.readdirSync(path.join(SKILLS_DIR, skillName));
+      for (const file of skillFiles) {
+        fs.copyFileSync(path.join(SKILLS_DIR, skillName, file), path.join(sharedDir, file));
+      }
+      console.log(`[aceforge] shared skill deployed: ${skillName} → ~/.openclaw/skills/`);
+    } catch (err) {
+      console.warn(`[aceforge] shared skill deploy failed: ${(err as Error).message}`);
+    }
+  }
 
   notify(_skillAction("✅", "Skill deployed", skillName));
   return { ok: true, message: `Skill '${skillName}' deployed. Active now.` };
@@ -324,6 +339,15 @@ function buildPlugin() {
           // Phase 2A: Capability tree rebuild
           try { buildCapabilityTree(); } catch (err) {
             log.error(`[aceforge] capability tree error: ${(err as Error).message}`);
+          }
+
+          // Phase 2C: Composition execution — propose workflow skills from co-activations
+          try {
+            proposeCompositionSkills().catch(err =>
+              log.error(`[aceforge] composition proposal error: ${(err as Error).message}`)
+            );
+          } catch (err) {
+            log.error(`[aceforge] composition error: ${(err as Error).message}`);
           }
 
           // Phase 2D: Proactive behavior gap detection
