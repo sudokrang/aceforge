@@ -80,7 +80,7 @@ AceForge operates as a 12-stage pipeline that runs continuously alongside your a
   args, result,       at 20+ skills)        APPROVE / REVISE / REJECT
   corrections                                       ↓
   4. Validate         5. Score              6. Approve
-  23 attack checks    Structural (0-100)    Telegram / Slack / log
+  23 attack checks    Structural (0-100)    All 25+ channels
   SOUL.md detection   Coverage (0-100)      /forge approve <n>
   Credential scan     LLM judge (40-70)     /forge reject <n>
   Path traversal                                    ↓
@@ -119,7 +119,7 @@ Skill generation uses two independent LLMs working in sequence:
 
 2. **Reviewer** (default: DeepSeek Chat) critiques the generated skill against structured criteria. It evaluates trigger precision, instruction specificity, anti-pattern grounding, and security. Verdict: APPROVE, REVISE (one retry), or REJECT.
 
-Both models are provider-agnostic — any OpenAI-compatible `/chat/completions` endpoint works. Rate-limited to 8 calls per cycle with 2-second intervals.
+Both models are provider-agnostic — any OpenAI-compatible `/chat/completions` or Anthropic-native `/v1/messages` endpoint works. Format auto-detected. Rate-limited to 8 calls per cycle with 2-second intervals.
 
 **Design intent:** The proposer/judge dual-model loop is validated by [Multi-Agent Evolve (arXiv:2510.23595)](https://arxiv.org/abs/2510.23595). Independent review with structured criteria (not open-ended judging) delivers 8-11% accuracy improvement per [DeepVerifier (arXiv:2601.15808)](https://arxiv.org/abs/2601.15808).
 
@@ -411,7 +411,7 @@ Expected:
 
 ### Provider Agnostic
 
-Both generator and reviewer use standard OpenAI-compatible `/chat/completions`. Any provider works:
+Both generator and reviewer support OpenAI-compatible (`/chat/completions`) and Anthropic-native (`/v1/messages`) endpoints. Format auto-detected from openclaw.json or provider name. Any provider works:
 
 | Provider | Base URL | Notes |
 |---|---|---|
@@ -423,7 +423,7 @@ Both generator and reviewer use standard OpenAI-compatible `/chat/completions`. 
 
 ### Channel Agnostic
 
-Notifications auto-detect your configured channel: Telegram, Slack, or log fallback.
+Notifications work across all 25+ OpenClaw channels. Plain text with Unicode + emoji is the primary design target. Telegram and Slack get additional rich formatting (HTML / mrkdwn) as a polish layer.
 
 ### OpenViking Compatible
 

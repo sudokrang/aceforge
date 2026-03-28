@@ -104,7 +104,7 @@
 <text x="508" y="190" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8.5" fill="#BA7517">Generator LLM</text>
 <text x="508" y="203" text-anchor="middle" font-family="'SF Mono',monospace" font-size="7.5" fill="#8b7540">Default: MiniMax M2.7</text>
 <text x="508" y="218" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8.5" fill="#BA7517">Reviewer LLM (CoT)</text>
-<text x="508" y="231" text-anchor="middle" font-family="'SF Mono',monospace" font-size="7.5" fill="#8b7540">Default: DeepSeek Reasoner</text>
+<text x="508" y="231" text-anchor="middle" font-family="'SF Mono',monospace" font-size="7.5" fill="#8b7540">Default: DeepSeek Chat</text>
 <line x1="440" y1="240" x2="575" y2="240" stroke="#30363d" stroke-width="0.5"/>
 <text x="508" y="256" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e">APPROVE · REVISE · REJECT</text>
 <text x="508" y="269" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e">Template fallback · Workflows</text>
@@ -140,7 +140,7 @@
 <text x="895" y="228" text-anchor="middle" font-family="'SF Mono',monospace" font-size="8" fill="#3d7a63">/forge reject</text>
 <text x="895" y="242" text-anchor="middle" font-family="'SF Mono',monospace" font-size="8" fill="#3d7a63">/forge preview</text>
 <line x1="850" y1="252" x2="940" y2="252" stroke="#30363d" stroke-width="0.5"/>
-<text x="895" y="268" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e">Telegram · Slack · log</text>
+<text x="895" y="268" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e">All configured channels</text>
 <text x="895" y="281" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#8b949e">Nothing auto-deploys</text>
 
 <!-- Arrow 5→6 -->
@@ -304,13 +304,13 @@
 
 <rect x="545" y="700" width="150" height="60" rx="6" fill="#15122a" stroke="#3d3573" stroke-width="0.5"/>
 <text x="620" y="722" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="600" fill="#AFA9EC">Notifications</text>
-<text x="620" y="737" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Telegram · Slack · log</text>
-<text x="620" y="749" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Auto-detect channel</text>
+<text x="620" y="737" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">All 25+ OpenClaw channels</text>
+<text x="620" y="749" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Tiered: plain + rich rendering</text>
 
 <rect x="710" y="700" width="150" height="60" rx="6" fill="#15122a" stroke="#3d3573" stroke-width="0.5"/>
 <text x="785" y="722" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="600" fill="#AFA9EC">LLM Providers</text>
-<text x="785" y="737" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">Any OpenAI-compatible API</text>
-<text x="785" y="749" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">MiniMax · DeepSeek · Local</text>
+<text x="785" y="737" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">OpenAI + Anthropic formats</text>
+<text x="785" y="749" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" fill="#7F77DD">MiniMax · DeepSeek · Anthropic</text>
 
 <rect x="875" y="700" width="150" height="60" rx="6" fill="#15122a" stroke="#3d3573" stroke-width="0.5"/>
 <text x="950" y="722" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="600" fill="#AFA9EC">Skill Index</text>
@@ -363,6 +363,6 @@
 <path d="M1050 300 L1050 370" fill="none" stroke="#F09595" stroke-width="0.8" opacity="0.2"/>
 
 <!-- Footer -->
-<text x="640" y="860" text-anchor="middle" font-family="'SF Mono',monospace" font-size="9" fill="#30363d">AceForge v0.8.2 · github.com/sudokrang/aceforge · MIT License</text>
+<text x="640" y="860" text-anchor="middle" font-family="'SF Mono',monospace" font-size="9" fill="#30363d">AceForge v0.9.0 · github.com/sudokrang/aceforge · MIT License</text>
 
 </svg>

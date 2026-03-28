@@ -407,9 +407,9 @@ function buildPlugin() {
             const transitions = runMaturityChecks();
             for (const t of transitions) {
               notify(
-                `Skill Maturity Promotion\n` +
-                `${t.skill} → ${t.transition}\n` +
-                `Criteria met: 50+ activations, 75%+ success, 14+ days deployed`
+                `🟣 ${bold("Maturity Promotion")}  ${mono(t.skill)}\n` +
+                `→ ${t.transition}\n` +
+                `50+ activations · 75%+ success · 14+ days`
               ).catch(() => {});
               log.info(`[aceforge] maturity: ${t.skill} promoted to ${t.transition}`);
             }
@@ -422,10 +422,10 @@ function buildPlugin() {
             const signals = runApoptosisChecks();
             for (const s of signals) {
               notify(
-                `Skill Apoptosis Signal\n` +
-                `${s.skill}: ${s.reason.replace(/_/g, " ")}\n` +
-                `${s.detail}\n` +
-                `Consider: /forge retire ${s.skill}`
+                `💀 ${bold("Apoptosis Signal")}  ${mono(s.skill)}\n` +
+                `${s.reason.replace(/_/g, " ")}\n` +
+                `${s.detail}\n\n` +
+                `${mono("/forge retire " + s.skill)}`
               ).catch(() => {});
               log.warn(`[aceforge] apoptosis: ${s.skill} — ${s.reason}: ${s.detail}`);
             }
@@ -485,7 +485,7 @@ function buildPlugin() {
           fs.mkdirSync(skillDir, { recursive: true });
           const skillMd = `---\nname: ${name}\ndescription: "${(description as string).replace(/"/g, '\\"')}"\nmetadata:\n  openclaw:\n    category: ${category}\n    aceforge:\n      status: proposed\n      proposed: ${new Date().toISOString()}\n---\n\n# ${name}\n\n${instructions}\n`;
           fs.writeFileSync(path.join(skillDir, "SKILL.md"), skillMd);
-          notify(`Proposed new skill: ${name} in ${category}\nPending: /forge_approve ${name}`);
+          notify(`📋 ${bold("Skill proposed")}  ${mono(name as string)}\n${category}\n\n${mono("/forge approve " + (name as string))}`);
           return { content: [{ type: "text", text: `Proposal saved: ${name}` }] };
         }
       });
@@ -511,7 +511,7 @@ function buildPlugin() {
           if (!skillName) return { content: [{ type: "text", text: "Missing skill name." }] };
           const deleted = deleteProposal(skillName);
           if (!deleted) return { content: [{ type: "text", text: `Proposal '${skillName}' not found.` }] };
-          notify(`Skill rejected: ${skillName}`);
+          notify(_skillAction("❌", "Skill rejected", skillName));
           return { content: [{ type: "text", text: `Skill '${skillName}' rejected.` }] };
         },
       });

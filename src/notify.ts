@@ -62,16 +62,47 @@ function loadNotifyConfig(): NotifyConfig {
 
 const notifyConfig = loadNotifyConfig();
 
+/**
+ * Sanitize text for Telegram HTML parse_mode.
+ * Escapes <, >, & in all text EXCEPT inside known-safe tags (<b>, <code>, <i>).
+ * This protects every call site — even raw notify() calls that don't use bold()/mono().
+ */
+function sanitizeTelegramHtml(text: string): string {
+  // Strategy: extract safe tags, escape everything else, restore tags
+  const safeTags: string[] = [];
+  const placeholder = (i: number) => `\x00TAG${i}\x00`;
+
+  // Pull out <b>...</b>, <code>...</code>, <i>...</i> tags
+  let sanitized = text.replace(/<(\/?)([bi]|code)>/g, (_match) => {
+    safeTags.push(_match);
+    return placeholder(safeTags.length - 1);
+  });
+
+  // Escape remaining HTML characters
+  sanitized = sanitized
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Restore safe tags
+  for (let i = 0; i < safeTags.length; i++) {
+    sanitized = sanitized.replace(placeholder(i), safeTags[i]);
+  }
+
+  return sanitized;
+}
+
 async function sendTelegram(
   message: string,
   cfg: { botToken: string; chatId: string }
 ): Promise<void> {
+  const safeMessage = sanitizeTelegramHtml(message);
   const res = await fetch(
     `https://api.telegram.org/bot${cfg.botToken}/sendMessage`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: cfg.chatId, text: message, parse_mode: "HTML" }),
+      body: JSON.stringify({ chat_id: cfg.chatId, text: safeMessage, parse_mode: "HTML" }),
     }
   );
   if (!res.ok) {
