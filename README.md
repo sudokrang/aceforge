@@ -68,7 +68,7 @@ AceForge is the **skill generation and lifecycle layer** for OpenClaw agents. It
 - **Not auto-deploying.** Every proposed skill, upgrade, and retirement requires human approval.
 - **Not a context engine.** Compatible with OpenViking, lossless-claw, or OpenClaw's built-in engine. AceForge generates skills; it doesn't own context.
 - **Not ClawHub-hostile.** If a ClawHub skill serves your agent well, AceForge leaves it alone. It only proposes upgrades when trace data shows the skill is underperforming.
-- **Not a fine-tuning system.** Skills are externalized artifacts — inspectable, editable, shareable, version-controlled. Not model weights.
+- **Not a fine-tuning system.** Skills are externalized artifacts — inspectable, editable, version-controlled. Not model weights.
 
 > **Observation-only mode:** Set `ACEFORGE_DRY_RUN=true` to log what skills would be proposed without writing anything to disk. Perfect for evaluating AceForge before committing.
 
@@ -634,7 +634,7 @@ Every major design decision in AceForge is grounded in peer-reviewed research. T
 | Self-evolving agent framework | [Self-Evolving Agents Survey](https://arxiv.org/abs/2507.21046) (Jul 2025) | Comprehensive framework: environment, experience, self evolution |
 | RL from deployment feedback | [OpenClaw-RL](https://arxiv.org/abs/2603.10165) (Mar 2026) | forge_rewards tool provides RL-compatible reward signals |
 | DAG-based pipeline composition | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Co-activation detection for future DAG orchestration |
-| Multi-agent skill sharing | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Capability tree as shareable ecosystem signal |
+| Multi-agent skill sharing | [AgentSkillOS](https://arxiv.org/abs/2603.02176) (Mar 2026) | Capability tree structure for multi-agent coordination |
 | Skill persistence as memory | [Memento-Skills](https://arxiv.org/abs/2603.18743) (Mar 2026) | Skills persist across sessions as evolving procedural memory |
 | Milestone-based skill accumulation | [SAGE](https://arxiv.org/abs/2512.17102) (Dec 2025) | Sequential Rollout — distillation at 500/2000/5000 activation milestones |
 | Summarize–Reflect–Locate–Revise | [K2-Agent](https://arxiv.org/abs/2603.00676) (Mar 2026) | SRLR loop for trace distillation and knowledge refinement |
@@ -648,9 +648,9 @@ Every major design decision in AceForge is grounded in peer-reviewed research. T
 
 ## What AceForge Is
 
-AceForge is a **skill engine**. It generates, validates, and manages SKILL.md files — the permanent, auditable, shareable artifacts that teach your agent how to do things.
+AceForge is a **skill engine**. It generates, validates, and manages SKILL.md files — permanent, auditable artifacts crystallized from your agent's actual behavior.
 
-It is not a memory system, a prompt optimizer, or an RL trainer. AceForge produces one thing: **validated SKILL.md files** that survive restarts, work across agents, and can be published to ClawHub.
+It is not a memory system, a prompt optimizer, or an RL trainer. AceForge produces one thing: **validated SKILL.md files** crystallized from your agent's real operational patterns.
 
 ---
 
