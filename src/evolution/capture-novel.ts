@@ -37,6 +37,35 @@ const MIN_RESULT_LENGTH = 20;
 /** Captures file path */
 const CAPTURES_FILE = path.join(FORGE_DIR, "captures.jsonl");
 
+// ─── Hot-path caches (v0.9.0 perf fix) ─────────────────────────────────
+
+/** Tools with known prior failures — skip full patterns.jsonl scan */
+const _knownFailureTools = new Set<string>();
+
+/** Skills directory listing cache with TTL */
+let _skillsDirCache: { entries: string[]; ts: number } | null = null;
+const SKILLS_CACHE_TTL_MS = 5000;
+
+function getCachedSkillsDir(): string[] {
+  if (_skillsDirCache && Date.now() - _skillsDirCache.ts < SKILLS_CACHE_TTL_MS) {
+    return _skillsDirCache.entries;
+  }
+  if (!fsSync.existsSync(SKILLS_DIR)) {
+    _skillsDirCache = { entries: [], ts: Date.now() };
+    return [];
+  }
+  try {
+    const entries = fsSync.readdirSync(SKILLS_DIR).filter(f => {
+      try { return fsSync.statSync(path.join(SKILLS_DIR, f)).isDirectory(); }
+      catch { return false; }
+    });
+    _skillsDirCache = { entries, ts: Date.now() };
+    return entries;
+  } catch {
+    return [];
+  }
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface CaptureEntry {
@@ -72,12 +101,11 @@ export function checkNovelSuccess(
   argsSummary: string | null,
   resultSummary: string | null,
   success: boolean,
-  session: string | null,
 ): CaptureCheck {
   // Must be a success
   if (!success) return { novel: false, reason: "not_success" };
 
-  // Check blocklists
+  // Check blocklists (cheap Set lookups first)
   if (ACEFORGE_TOOL_BLOCKLIST.has(toolName)) {
     return { novel: false, reason: "blocklisted_aceforge" };
   }
@@ -85,30 +113,30 @@ export function checkNovelSuccess(
     return { novel: false, reason: "blocklisted_native" };
   }
 
-  // Check for existing deployed skill
-  if (fsSync.existsSync(SKILLS_DIR)) {
-    for (const skillName of fsSync.readdirSync(SKILLS_DIR)) {
+  // Check result is non-trivial (cheap length check before any I/O)
+  if (!resultSummary || resultSummary.length < MIN_RESULT_LENGTH) {
+    return { novel: false, reason: "trivial_result" };
+  }
+
+  // Check for existing deployed skill (cached directory listing)
+  const skillDirs = getCachedSkillsDir();
+  for (const skillName of skillDirs) {
+    // Exact match or prefix match
+    if (skillName === toolName || skillName.startsWith(toolName + "-") ||
+        toolName.startsWith(skillName + "_") || toolName.startsWith(skillName + "-")) {
+      return { novel: false, reason: "skill_exists" };
+    }
+
+    // Frontmatter tool field match (only reads SKILL.md if prefix didn't match)
+    const skillFile = path.join(SKILLS_DIR, skillName, "SKILL.md");
+    if (fsSync.existsSync(skillFile)) {
       try {
-        if (!fsSync.statSync(path.join(SKILLS_DIR, skillName)).isDirectory()) continue;
-      } catch { continue; }
-
-      // Exact match or prefix match
-      if (skillName === toolName || skillName.startsWith(toolName + "-") ||
-          toolName.startsWith(skillName + "_") || toolName.startsWith(skillName + "-")) {
-        return { novel: false, reason: "skill_exists" };
-      }
-
-      // Frontmatter tool field match
-      const skillFile = path.join(SKILLS_DIR, skillName, "SKILL.md");
-      if (fsSync.existsSync(skillFile)) {
-        try {
-          const content = fsSync.readFileSync(skillFile, "utf-8");
-          const toolMatch = content.match(/^\s*tool:\s*(.+)$/m);
-          if (toolMatch && toolMatch[1].trim() === toolName) {
-            return { novel: false, reason: "skill_exists" };
-          }
-        } catch { /* skip */ }
-      }
+        const content = fsSync.readFileSync(skillFile, "utf-8");
+        const toolMatch = content.match(/^\s*tool:\s*(.+)$/m);
+        if (toolMatch && toolMatch[1].trim() === toolName) {
+          return { novel: false, reason: "skill_exists" };
+        }
+      } catch { /* skip */ }
     }
   }
 
@@ -120,11 +148,6 @@ export function checkNovelSuccess(
         return { novel: false, reason: "proposal_pending" };
       }
     }
-  }
-
-  // Check result is non-trivial
-  if (!resultSummary || resultSummary.length < MIN_RESULT_LENGTH) {
-    return { novel: false, reason: "trivial_result" };
   }
 
   // Normalize arg pattern for comparison
@@ -145,19 +168,26 @@ export function checkNovelSuccess(
   }
 
   // Check for prior failures with this pattern (one-shot = first-try success)
+  // Fast path: if we already know this tool has failures, skip full file scan
+  if (_knownFailureTools.has(toolName)) {
+    return { novel: false, reason: "prior_failure" };
+  }
+
   const patternsFile = path.join(FORGE_DIR, "patterns.jsonl");
   if (fsSync.existsSync(patternsFile)) {
+    // Read only the last 500 lines for performance (failures in older data are stale)
     const content = fsSync.readFileSync(patternsFile, "utf-8");
     const lines = content.split("\n").filter(l => l.trim());
-    for (const line of lines) {
+    const recentLines = lines.slice(-500);
+    for (const line of recentLines) {
       try {
         const entry = JSON.parse(line) as PatternEntry;
-        if (
-          entry.tool === toolName &&
-          !entry.success &&
-          normalizeArgPattern(entry.args_summary) === normalizedArgs
-        ) {
-          return { novel: false, reason: "prior_failure" };
+        if (entry.tool === toolName && !entry.success) {
+          // Cache this tool as having failures — all future checks skip file I/O
+          _knownFailureTools.add(toolName);
+          if (normalizeArgPattern(entry.args_summary) === normalizedArgs) {
+            return { novel: false, reason: "prior_failure" };
+          }
         }
       } catch { /* skip */ }
     }

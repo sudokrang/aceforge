@@ -331,11 +331,14 @@ export function distillNewTraces(skillName: string, milestone: number): Distilla
     } catch { /* skip */ }
   }
 
-  // Load all traces and post-deploy traces
+  // Load traces ONCE, split in memory (perf fix: was 3 file reads)
   const allTraces = loadTraces(toolName);
-  const newTraces = loadTraces(toolName, deployTs);
+  const deployTime = new Date(deployTs).getTime();
+  const newTraceEntries = allTraces.entries.filter(e => new Date(e.ts).getTime() > deployTime);
+  const newTraceCorrections = allTraces.corrections.filter(c => new Date(c.ts).getTime() > deployTime);
+  const newTraceSessions = new Set(newTraceEntries.filter(e => e.session).map(e => e.session!));
 
-  if (newTraces.entries.length === 0) return null;
+  if (newTraceEntries.length === 0) return null;
 
   // ═══ Phase 1: Summarize ═══════════════════════════════════════════════
 
@@ -379,7 +382,7 @@ export function distillNewTraces(skillName: string, milestone: number): Distilla
 
   const preDeployFailures = new Set(
     extractFailurePatterns(
-      preDeployTraces.entries.filter(e => new Date(e.ts).getTime() <= new Date(deployTs!).getTime())
+      allTraces.entries.filter(e => new Date(e.ts).getTime() <= deployTime)
     ).map(f => f.error)
   );
 
@@ -387,12 +390,12 @@ export function distillNewTraces(skillName: string, milestone: number): Distilla
     .filter(f => !preDeployFailures.has(f.error));
 
   // Corrections since deployment
-  const newCorrections = newTraces.corrections
+  const newCorrections = newTraceCorrections
     .filter(c => c.text_fragment)
     .map(c => ({ text: c.text_fragment!, ts: c.ts }));
 
-  const postDeploySuccessRate = newTraces.entries.length > 0
-    ? (newTraces.entries.filter(e => e.success).length / newTraces.entries.length)
+  const postDeploySuccessRate = newTraceEntries.length > 0
+    ? (newTraceEntries.filter(e => e.success).length / newTraceEntries.length)
     : 0;
   const successRateDelta = Math.round((postDeploySuccessRate - baselineSuccessRate) * 100);
 
@@ -493,7 +496,7 @@ export function distillNewTraces(skillName: string, milestone: number): Distilla
     totalActivations,
     tracesAtDeploy,
     tracesNow: allTraces.entries.length,
-    newTraceCount: newTraces.entries.length,
+    newTraceCount: newTraceEntries.length,
     summary,
     reflection,
     divergences,

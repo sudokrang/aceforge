@@ -48,6 +48,26 @@ const sessionToolHistory = new Map<string, { tool: string; ts: number }[]>();
 const CHAIN_WINDOW_MS = 60000;
 const CHAIN_MIN_LENGTH = 3;
 
+// ─── Skills directory cache (perf fix: avoids readdirSync + statSync per tool call) ──
+let _skillsDirListCache: { dirs: string[]; ts: number } | null = null;
+const SKILLS_DIR_CACHE_TTL = 5000;
+
+function getSkillsDirCached(): string[] {
+  if (_skillsDirListCache && Date.now() - _skillsDirListCache.ts < SKILLS_DIR_CACHE_TTL) {
+    return _skillsDirListCache.dirs;
+  }
+  if (!fsSync.existsSync(SKILLS_DIR)) {
+    _skillsDirListCache = { dirs: [], ts: Date.now() };
+    return [];
+  }
+  const dirs = fsSync.readdirSync(SKILLS_DIR).filter(f => {
+    try { return fsSync.statSync(path.join(SKILLS_DIR, f)).isDirectory(); }
+    catch { return false; }
+  });
+  _skillsDirListCache = { dirs, ts: Date.now() };
+  return dirs;
+}
+
 // ─── G7: Persist session history to disk ────────────────────────
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const FLUSH_DEBOUNCE_MS = 2000;
@@ -102,13 +122,10 @@ hydrateSessionHistory();
  * not a full-text regex that matches any mention of the tool name.
  */
 function resolveSkillActivation(toolName: string, _argsSummary: string | null): string | null {
-  if (!fsSync.existsSync(SKILLS_DIR)) return null;
+  const skillDirs = getSkillsDirCached();
+  if (skillDirs.length === 0) return null;
 
-  for (const skillName of fsSync.readdirSync(SKILLS_DIR)) {
-    const skillDir = path.join(SKILLS_DIR, skillName);
-    try {
-      if (!fsSync.statSync(skillDir).isDirectory()) continue;
-    } catch { continue; }
+  for (const skillName of skillDirs) {
 
     // Match 1: exact name match (skill "tavily" matches tool "tavily")
     if (skillName === toolName) return skillName;
@@ -254,22 +271,28 @@ export function captureToolTrace(event: any, ctx: any, api?: any): void {
         }
 
         // ── v0.9.0: Milestone distillation check ────────────────────
+        // checkMilestone is fast (in-memory cache after first hit).
+        // distillNewTraces is heavy (file I/O) — deferred off the hot path.
         const msCheck = checkMilestone(matchedSkill, stats.activations);
         if (msCheck.hit && !msCheck.alreadyDistilled && msCheck.milestone) {
-          try {
-            const report = distillNewTraces(matchedSkill, msCheck.milestone);
-            if (report) {
-              recordDistillation(matchedSkill, msCheck.milestone, report.meaningful);
-              if (report.meaningful) {
-                notify(formatDistillationNotification(report)).catch(err =>
-                  console.error("[aceforge] distill notify error:", (err as Error).message)
-                );
+          const _msSkill = matchedSkill;
+          const _msMilestone = msCheck.milestone;
+          setTimeout(() => {
+            try {
+              const report = distillNewTraces(_msSkill, _msMilestone);
+              if (report) {
+                recordDistillation(_msSkill, _msMilestone, report.meaningful);
+                if (report.meaningful) {
+                  notify(formatDistillationNotification(report)).catch(err =>
+                    console.error("[aceforge] distill notify error:", (err as Error).message)
+                  );
+                }
+                console.log(`[aceforge] distillation at ${_msMilestone} for ${_msSkill}: ${report.meaningful ? "meaningful" : "no action"}`);
               }
-              console.log(`[aceforge] distillation at ${msCheck.milestone} for ${matchedSkill}: ${report.meaningful ? "meaningful" : "no action"}`);
+            } catch (distillErr) {
+              console.error(`[aceforge] milestone distill error: ${(distillErr as Error).message}`);
             }
-          } catch (distillErr) {
-            console.error(`[aceforge] milestone distill error: ${(distillErr as Error).message}`);
-          }
+          }, 0);
         }
 
         if (api?.logger) {
