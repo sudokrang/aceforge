@@ -118,7 +118,7 @@ export async function analyzePatterns(): Promise<void> {
         const tracesAtDeploy = (baseline as any).traceCountAtDeploy || 0;
         const newTraceCount = entries.length - tracesAtDeploy;
 
-        if (newTraceCount >= 50 && !hasExistingProposal(key + "-") && !hasExistingProposal(deployedSkill + "-v")) {
+        if (newTraceCount >= 50 && !hasExistingProposal(key + "-") && !hasExistingProposal(deployedSkill + "-v") && !hasExistingProposal(deployedSkill + "-evolved")) {
           console.log(`[aceforge] ${key} has ${newTraceCount} new traces — triggering evolution`);
           const existingMdPath = path.join(SKILLS_DIR, deployedSkill, "SKILL.md");
           try {

@@ -377,7 +377,7 @@ export function distillNewTraces(skillName: string, milestone: number): Distilla
       )
   );
 
-  const newArgPatterns = extractArgPatterns(newTraces.entries)
+  const newArgPatterns = extractArgPatterns(newTraceEntries)
     .filter(p => !preDeployPatterns.has(p.pattern));
 
   const preDeployFailures = new Set(
@@ -386,7 +386,7 @@ export function distillNewTraces(skillName: string, milestone: number): Distilla
     ).map(f => f.error)
   );
 
-  const newFailurePatterns = extractFailurePatterns(newTraces.entries)
+  const newFailurePatterns = extractFailurePatterns(newTraceEntries)
     .filter(f => !preDeployFailures.has(f.error));
 
   // Corrections since deployment

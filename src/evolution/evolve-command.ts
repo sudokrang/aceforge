@@ -324,6 +324,17 @@ export async function executeEvolve(
     return { success: false, error: `Skill '${skillName}' has no SKILL.md.` };
   }
 
+  // Guard: check for any existing evolution/upgrade proposal for this skill
+  // Prevents duplicate proposals from analyze.ts Path 1 and /forge evolve racing
+  const proposalsDir = path.join(FORGE_DIR, "proposals");
+  if (fsSync.existsSync(proposalsDir)) {
+    for (const existing of fsSync.readdirSync(proposalsDir)) {
+      if (existing.startsWith(skillName + "-") || existing.startsWith(skillName.replace(/-(v\d+|rev\d+|upgrade|evolved)$/, "") + "-")) {
+        return { success: false, error: `Proposal '${existing}' already pending for this skill. Approve or reject it first.` };
+      }
+    }
+  }
+
   const currentMd = fsSync.readFileSync(skillFile, "utf-8");
 
   // 2. Run distillation — find the best milestone
