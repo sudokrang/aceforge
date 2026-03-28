@@ -356,6 +356,18 @@ function buildPlugin() {
             if (behaviorGaps.length > 0) {
               const criticalGaps = behaviorGaps.filter(g => g.count >= 5);
               if (criticalGaps.length > 0) {
+                // Rate limit: max once per 24 hours
+                const gapNotifyFile = path.join(FORGE_DIR, ".last-gap-notify");
+                const GAP_NOTIFY_INTERVAL = 24 * 60 * 60 * 1000;
+                let shouldNotifyGaps = true;
+                try {
+                  if (fs.existsSync(gapNotifyFile)) {
+                    const last = new Date(fs.readFileSync(gapNotifyFile, "utf-8").trim()).getTime();
+                    if (Date.now() - last < GAP_NOTIFY_INTERVAL) shouldNotifyGaps = false;
+                  }
+                } catch { /* first run */ }
+
+                if (shouldNotifyGaps) {
                 // Build human-readable notification per gap
                 const gapMessages: string[] = [];
                 for (const g of criticalGaps) {
@@ -392,6 +404,8 @@ function buildPlugin() {
                   `🔍 ${bold("Agent Behavior Gap")}\n\n` +
                   gapMessages.join("\n\n")
                 ).catch(() => {});
+                try { fs.writeFileSync(gapNotifyFile, new Date().toISOString()); } catch { /* non-critical */ }
+                } // end shouldNotifyGaps
               }
             }
             updateTreeWithBehaviorGaps();
@@ -1240,7 +1254,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.9.3 — all hooks, tools, commands, and evolution engine registered ");
+      log.info("[aceforge] v0.9.4 — all hooks, tools, commands, and evolution engine registered ");
     }
   };
 }
