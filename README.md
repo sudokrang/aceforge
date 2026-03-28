@@ -394,23 +394,26 @@ These tools are registered for programmatic use by the agent itself: `forge`, `f
 
 ## Installation
 
-```bash
-git clone https://github.com/sudokrang/aceforge.git ~/.openclaw/extensions/aceforge
-cd ~/.openclaw/extensions/aceforge && npm install
-openclaw gateway restart
-```
+One command:
+
+    openclaw plugins install aceforge
+
+Then restart your gateway:
+
+    openclaw gateway restart
 
 Verify:
 
-```bash
-openclaw plugins list | grep aceforge
-```
+    openclaw plugins list | grep aceforge
 
-Expected:
+**Alternative install methods:**
 
-```
-[aceforge] v0.9.0 — all hooks, tools, commands, and evolution engine registered
-```
+    # From npm directly
+    npm install aceforge
+
+    # From source (for development)
+    git clone https://github.com/sudokrang/aceforge.git ~/.openclaw/extensions/aceforge
+    cd ~/.openclaw/extensions/aceforge && npm install
 
 ---
 
