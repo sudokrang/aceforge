@@ -327,10 +327,21 @@ export async function executeEvolve(
 
   // Guard: check for any existing evolution/upgrade proposal for this skill
   // Prevents duplicate proposals from analyze.ts Path 1 and /forge evolve racing
+  // Uses exact name matching to avoid false positives (e.g. "git" blocking "git-manager")
   const proposalsDir = path.join(FORGE_DIR, "proposals");
   if (fsSync.existsSync(proposalsDir)) {
+    const baseName = skillName.replace(/-(v\d+|rev\d+|upgrade|evolved)$/, "");
+    const exactSuffixes = ["-evolved", "-upgrade", "-rev-"];
     for (const existing of fsSync.readdirSync(proposalsDir)) {
-      if (existing.startsWith(skillName + "-") || existing.startsWith(skillName.replace(/-(v\d+|rev\d+|upgrade|evolved)$/, "") + "-")) {
+      // Match: skillName-evolved, skillName-upgrade, skillName-rev-*
+      // Also match: baseName-evolved, baseName-upgrade (for versioned skills)
+      const isExactMatch = exactSuffixes.some(s =>
+        existing === skillName + s.replace(/-$/, "") ||
+        existing.startsWith(skillName + s) ||
+        existing === baseName + s.replace(/-$/, "") ||
+        existing.startsWith(baseName + s)
+      );
+      if (isExactMatch) {
         return { success: false, error: `Proposal '${existing}' already pending for this skill. Approve or reject it first.` };
       }
     }
@@ -392,6 +403,13 @@ export async function executeEvolve(
   // 6. Clean up LLM output
   revisedMd = cleanLlmOutput(revisedMd);
 
+  if (!revisedMd || revisedMd.trim().length < 10) {
+    return {
+      success: false,
+      error: "LLM produced empty or trivially short output after cleanup. Review the report and edit manually.",
+    };
+  }
+
   // 7. Generate diff
   const diff = generateUnifiedDiff(
     currentMd,
@@ -411,7 +429,14 @@ export async function executeEvolve(
   // 8. Write proposal
   const proposalName = `${skillName}-evolved`;
   const proposalDir = path.join(FORGE_DIR, "proposals", proposalName);
-  fsSync.mkdirSync(proposalDir, { recursive: true });
+  try {
+    fsSync.mkdirSync(proposalDir, { recursive: true });
+  } catch (fsErr) {
+    return {
+      success: false,
+      error: `Cannot create proposal directory: ${(fsErr as Error).message}`,
+    };
+  }
   fsSync.writeFileSync(path.join(proposalDir, "SKILL.md"), revisedMd);
 
   // Write diff file for reference
