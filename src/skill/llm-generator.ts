@@ -643,7 +643,7 @@ Output ONLY the complete revised SKILL.md content. No markdown fences, no preamb
   let feedback: string | undefined;
   if (config.reviewerKey) {
     try {
-      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd));
+      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd), config.reviewerApiFormat);
       const firstLine = review.verdict.trim().split("\n")[0].toUpperCase();
       if (firstLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = review.verdict.trim(); }
       else { verdict = "APPROVE"; }
@@ -712,7 +712,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
   let feedback: string | undefined;
   if (config.reviewerKey) {
     try {
-      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd));
+      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd), config.reviewerApiFormat);
       const firstLine = review.verdict.trim().split("\n")[0].toUpperCase();
       if (firstLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = review.verdict.trim(); }
     } catch (err) {
@@ -777,7 +777,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
   let feedback: string | undefined;
   if (config.reviewerKey) {
     try {
-      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd));
+      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd), config.reviewerApiFormat);
       const firstLine = review.verdict.trim().split("\n")[0].toUpperCase();
       if (firstLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = review.verdict.trim(); }
     } catch (err) {
@@ -858,7 +858,7 @@ Output ONLY the raw SKILL.md content. No markdown fences, no preamble.`;
   let feedback: string | undefined;
   if (config.reviewerKey) {
     try {
-      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd));
+      const review = await callReviewer(config.reviewerUrl, config.reviewerKey, config.reviewerModel, buildReviewPrompt(generatedMd), config.reviewerApiFormat);
       const firstLine = review.verdict.trim().split("\n")[0].toUpperCase();
       if (firstLine.startsWith("REJECT")) { verdict = "REJECT"; feedback = review.verdict.trim(); }
     } catch (err) {

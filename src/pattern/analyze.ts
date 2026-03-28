@@ -222,9 +222,9 @@ export async function analyzePatterns(): Promise<void> {
 
             const reportText = `${report.deficiencies.slice(0, 3).join("; ")}`;
             notify(
-              `Skill Upgrade Proposal\n` +
-              `${upgradeName} (replaces ${deployedSkill})\n` +
-              `Current score: ${finalScore}/100\n` +
+              `⬆️ ${bold("Upgrade Proposal")}\n\n` +
+              `${bold(upgradeName)}\n` +
+              `Replaces ${deployedSkill} · Score: ${finalScore}/100\n` +
               `Issues: ${reportText}\n` +
               (judgeReasoning ? `LLM judge: ${judgeReasoning.slice(0, 100)}\n` : "") +
               `Use: /forge upgrade ${deployedSkill}  or  /forge reject ${upgradeName}`
