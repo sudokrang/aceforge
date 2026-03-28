@@ -385,6 +385,65 @@ export async function analyzePatterns(): Promise<void> {
     `${newCandidates} new candidates`
   );
 
+  // ─── Warming-up notification ──────────────────────────────────────
+  // When no proposals are generated, tell the user what AceForge is
+  // tracking and how close tools are to crystallization threshold.
+  // Rate-limited: max once per 24 hours.
+  if (newCandidates === 0 && groups.size > 0) {
+    const warmupFile = path.join(FORGE_DIR, ".last-warmup-notify");
+    const WARMUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+    let shouldNotify = true;
+
+    try {
+      if (fsSync.existsSync(warmupFile)) {
+        const lastNotify = new Date(fsSync.readFileSync(warmupFile, "utf-8").trim()).getTime();
+        if (Date.now() - lastNotify < WARMUP_INTERVAL_MS) shouldNotify = false;
+      }
+    } catch { /* first run or corrupt file — notify */ }
+
+    if (shouldNotify) {
+      // Find tools approaching threshold
+      const approaching: { tool: string; count: number; needed: number }[] = [];
+      for (const [tool, entries] of groups) {
+        if (entries.length < effectiveThreshold && entries.length >= 1) {
+          // Skip tools that already have a proposal or skill
+          if (hasActiveProposalOrSkill(tool)) continue;
+          approaching.push({
+            tool,
+            count: entries.length,
+            needed: effectiveThreshold - entries.length,
+          });
+        }
+      }
+
+      if (approaching.length > 0) {
+        approaching.sort((a, b) => a.needed - b.needed);
+        const top = approaching.slice(0, 4);
+        const toolLines = top.map(t =>
+          `  ${mono(t.tool)} — ${t.count}/${effectiveThreshold} occurrences (${t.needed} more to go)`
+        ).join("\n");
+
+        const activeSkills = fsSync.existsSync(SKILLS_DIR)
+          ? fsSync.readdirSync(SKILLS_DIR).filter(d =>
+              fsSync.existsSync(path.join(SKILLS_DIR, d, "SKILL.md"))
+            ).length
+          : 0;
+
+        notify(
+          `👀 ${bold("AceForge is watching")}\n\n` +
+          `Tracking ${bold(String(groups.size))} tools across your sessions` +
+          (activeSkills > 0 ? ` · ${activeSkills} skill${activeSkills !== 1 ? "s" : ""} active` : "") +
+          `\n\nClosest to crystallization:\n${toolLines}\n\n` +
+          `Skills are proposed once a tool reaches ${effectiveThreshold} uses across 2+ sessions.`
+        ).catch(() => {});
+
+        try {
+          fsSync.writeFileSync(warmupFile, new Date().toISOString());
+        } catch { /* non-critical */ }
+      }
+    }
+  }
+
   // Chain-to-Workflow Analysis
   await analyzeChains(patterns).catch(err =>
     console.error(`[aceforge] chain analysis error: ${(err as Error).message}`)
