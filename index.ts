@@ -16,7 +16,7 @@ import { detectCorrectionPatterns } from "./src/pattern/detect.js";
 import { analyzePatterns } from "./src/pattern/analyze.js";
 import { buildHierarchicalSkillIndex } from "./src/skill/index.js";
 import { notify } from "./src/notify.js";
-import { bold, mono, metric, compose, actions as fmtActions } from "./src/notify-format.js";
+import { bold, mono, metric } from "./src/notify-format.js";
 
 // Formatting helper for action notifications — module scope so validateAndDeploy can use it
 const _skillAction = (icon: string, verb: string, name: string): string =>
@@ -41,7 +41,6 @@ import {
   checkMaturityTransition,
   runMaturityChecks,
   runApoptosisChecks,
-  isShortCircuitCandidate,
 } from "./src/skill/lifecycle.js";
 import { checkVikingHealth } from "./src/viking/client.js";
 import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";

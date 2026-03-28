@@ -42,8 +42,8 @@ async function rateLimitedFetch(url: string, init: RequestInit): Promise<Respons
   return res;
 }
 
-// PROVIDER_DEFAULTS imported from llm-generator.ts — single source of truth
-// loadLlmConfig also imported from there (uses the shared defaults)
+// loadLlmConfig imported from llm-generator.ts — single source of truth.
+// PROVIDER_DEFAULTS are embedded in loadLlmConfig; judge uses config output only.
 
 
 

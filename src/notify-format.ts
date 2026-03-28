@@ -4,86 +4,94 @@
  * Tier 1 (Plain): Unicode + emoji + whitespace. Works on ALL channels.
  *   WhatsApp, Signal, iMessage, IRC, Matrix, Nostr, WeChat, LINE, etc.
  *
- * Tier 2 (Rich): Adds native formatting for channels that render it.
- *   Telegram → HTML (<b>, <code>, <i>)
- *   Slack → mrkdwn (*bold*, `code`)
+ * Tier 2 (Rich): Adds native formatting based on FORMAT TYPE, not channel name.
+ *   html     → Telegram, email, any HTML-rendering channel
+ *   markdown → Discord, Matrix, IRC (most modern chat platforms)
+ *   mrkdwn   → Slack (single * for bold, _ for italic)
+ *   plain    → everything else (Tier 1 only)
+ *
+ * Adding a new channel: map it to a format type in FORMAT_MAP below.
+ * Never touch the primitives — they work on format types, not channels.
  *
  * Design principles:
  *   - Plain text is the PRIMARY target, not a fallback
  *   - Rich formatting is a polish layer, never required for readability
- *   - Monospace commands = tap-to-copy on Telegram, visual distinction on Slack
+ *   - Monospace commands = tap-to-copy on Telegram, visual distinction elsewhere
  *   - Consistent emoji vocabulary across all notification types
  *   - Mobile-first: scan in 2 seconds on a phone lock screen
  */
-import * as os from "os";
-import * as path from "path";
-import * as fsSync from "fs";
+import { getNotifyChannel } from "./notify.js";
 
-// ─── Channel Detection ──────────────────────────────────────────────────
+// ─── Format Types ───────────────────────────────────────────────────────
+// The formatting primitives operate on these — never on channel names.
 
-export type NotifyChannel = "telegram" | "slack" | "log" | "plain";
+export type FormatType = "html" | "markdown" | "mrkdwn" | "plain";
 
-let _detected: NotifyChannel | null = null;
+/**
+ * Map transport channel → format type.
+ * This is the ONLY place channel names appear in the formatting layer.
+ * Adding a new channel: one line here. Zero changes to bold/mono/italic.
+ */
+const FORMAT_MAP: Record<string, FormatType> = {
+  telegram: "html",
+  slack:    "mrkdwn",
+  discord:  "markdown",
+  matrix:   "markdown",
+  irc:      "plain",
+  log:      "plain",
+};
+
+// Legacy compat: re-export channel type for any consumers
+export type NotifyChannel = "telegram" | "slack" | "discord" | "log" | "plain";
+
+let _format: FormatType | null = null;
 
 export function detectChannel(): NotifyChannel {
-  if (_detected) return _detected;
-
-  const HOME = os.homedir() || process.env.HOME || "";
-  const forced = process.env.ACEFORGE_NOTIFICATION_CHANNEL;
-  if (forced && ["telegram", "slack", "log"].includes(forced)) {
-    _detected = forced as NotifyChannel;
-    return _detected;
-  }
-
-  // Read from openclaw.json — same logic as notify.ts
-  try {
-    const cfgPath = path.join(HOME, ".openclaw", "openclaw.json");
-    const cfg = JSON.parse(fsSync.readFileSync(cfgPath, "utf-8"));
-    const tg = cfg?.channels?.telegram;
-    const tgToken = tg?.botToken || process.env.ACEFORGE_TELEGRAM_BOT_TOKEN || "";
-    const tgChatId = process.env.ACEFORGE_OWNER_CHAT_ID || "";
-    if (tgToken && tgChatId) { _detected = "telegram"; return "telegram"; }
-  } catch { /* no config */ }
-
-  if (process.env.ACEFORGE_TELEGRAM_BOT_TOKEN && process.env.ACEFORGE_OWNER_CHAT_ID) {
-    _detected = "telegram"; return "telegram";
-  }
-  if (process.env.ACEFORGE_SLACK_WEBHOOK_URL) {
-    _detected = "slack"; return "slack";
-  }
-
-  _detected = "plain";
-  return "plain";
+  // Legacy: returns channel name for any code that still needs it
+  const ch = getNotifyChannel();
+  return ch === "log" ? "plain" : ch as NotifyChannel;
 }
 
-// ─── Formatting Primitives ──────────────────────────────────────────────
-// Each returns the same logical content, rendered for the active channel.
+function getFormat(): FormatType {
+  if (_format) return _format;
+  const ch = getNotifyChannel();
+  _format = FORMAT_MAP[ch] || "plain";
+  return _format;
+}
+
+// ─── HTML Escaping (for html format only) ───────────────────────────────
 
 function escHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// ─── Formatting Primitives ──────────────────────────────────────────────
+// Each operates on FORMAT TYPE. Adding a channel never touches these.
+
 /** Bold text — titles, labels, emphasis */
 export function bold(text: string): string {
-  const ch = detectChannel();
-  if (ch === "telegram") return `<b>${escHtml(text)}</b>`;
-  if (ch === "slack") return `*${text}*`;
+  const fmt = getFormat();
+  if (fmt === "html") return `<b>${escHtml(text)}</b>`;
+  if (fmt === "mrkdwn") return `*${text}*`;
+  if (fmt === "markdown") return `**${text}**`;
   return text;
 }
 
 /** Italic text — descriptions, subtitles */
 export function italic(text: string): string {
-  const ch = detectChannel();
-  if (ch === "telegram") return `<i>${escHtml(text)}</i>`;
-  if (ch === "slack") return `_${text}_`;
+  const fmt = getFormat();
+  if (fmt === "html") return `<i>${escHtml(text)}</i>`;
+  if (fmt === "mrkdwn") return `_${text}_`;
+  if (fmt === "markdown") return `*${text}*`;
   return text;
 }
 
 /** Monospace — commands (tap-to-copy on Telegram), tool names */
 export function mono(text: string): string {
-  const ch = detectChannel();
-  if (ch === "telegram") return `<code>${escHtml(text)}</code>`;
-  if (ch === "slack") return `\`${text}\``;
+  const fmt = getFormat();
+  if (fmt === "html") return `<code>${escHtml(text)}</code>`;
+  if (fmt === "mrkdwn") return `\`${text}\``;
+  if (fmt === "markdown") return `\`${text}\``;
   return text;
 }
 

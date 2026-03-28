@@ -23,6 +23,7 @@ import * as fsSync from "fs";
 import * as path from "path";
 import { FORGE_DIR, SKILLS_DIR, PatternEntry } from "../pattern/constants.js";
 import { distillNewTraces, type DistillationReport } from "./distill.js";
+import { isShortCircuitCandidate, getSkillMaturity } from "../skill/lifecycle.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -435,12 +436,19 @@ export async function executeEvolve(
   };
   fsSync.appendFileSync(candidatesFile, JSON.stringify(candidateEntry) + "\n");
 
+  // v0.9.0: Check if parent skill qualifies for fast-track (mature + high performance)
+  const fastTrack = isShortCircuitCandidate(skillName);
+  const maturity = getSkillMaturity(skillName);
+  const fastTrackNote = fastTrack
+    ? `\n\n⚡ Fast-track: ${skillName} is ${maturity} with proven performance — approve with confidence.`
+    : "";
+
   return {
     success: true,
     proposalName,
     diff,
     distillation: report,
-    summary: `Evolution proposal '${proposalName}' created with ${report.divergences.length} divergence(s). Use /forge approve ${proposalName} to deploy.`,
+    summary: `Evolution proposal '${proposalName}' created with ${report.divergences.length} divergence(s). Use /forge approve ${proposalName} to deploy.${fastTrackNote}`,
   };
 }
 
