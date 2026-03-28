@@ -1240,7 +1240,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.9.1 — all hooks, tools, commands, and evolution engine registered ");
+      log.info("[aceforge] v0.9.2 — all hooks, tools, commands, and evolution engine registered ");
     }
   };
 }
