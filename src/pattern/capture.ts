@@ -141,7 +141,7 @@ function resolveSkillActivation(toolName: string, _argsSummary: string | null): 
     if (toolName.startsWith(skillName + "_") || toolName.startsWith(skillName + "-")) return skillName;
 
     // Match 4: explicit tool metadata in frontmatter
-    const skillFile = path.join(skillDir, "SKILL.md");
+    const skillFile = path.join(SKILLS_DIR, skillName, "SKILL.md");
     if (!fsSync.existsSync(skillFile)) continue;
 
     try {

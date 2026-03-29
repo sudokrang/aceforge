@@ -42,7 +42,6 @@ import {
   runMaturityChecks,
   runApoptosisChecks,
 } from "./src/skill/lifecycle.js";
-import { checkVikingHealth } from "./src/viking/client.js";
 import { scoreSkill, formatQualityReport } from "./src/skill/quality-score.js";
 import { detectGaps } from "./src/pattern/gap-detect.js";
 import { NATIVE_TOOLS } from "./src/pattern/constants.js";
@@ -222,16 +221,6 @@ function buildPlugin() {
             tests.push("❌ .forge/ NOT writable");
           }
 
-          // Test 2: OpenViking health (optional — non-blocking)
-          try {
-            const vikingStatus = await checkVikingHealth();
-            tests.push(vikingStatus.available
-              ? `✅ OpenViking: ${vikingStatus.url}`
-              : `⚠️ OpenViking not reachable (optional): ${vikingStatus.url}`
-            );
-          } catch {
-            tests.push("⚠️ OpenViking check skipped");
-          }
 
           // Test 3: Telegram bot
           try {
@@ -664,10 +653,6 @@ function buildPlugin() {
               text += `${metric("Traces", `${patternCount} patterns · ${candidateCount} candidates`)}\n`;
               text += `${metric("Threshold", `${threshold}× recurrences`)}\n`;
 
-              try {
-                const vikingStatus = await checkVikingHealth();
-                text += `🔮 OpenViking: ${vikingStatus.available ? "connected" : "not reachable"} (${vikingStatus.url})\n`;
-              } catch { text += `🔮 OpenViking: check failed\n`; }
 
               const priority = getPriorityDomains(0.4);
               if (priority.length > 0) {
@@ -1254,7 +1239,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.9.4 — all hooks, tools, commands, and evolution engine registered ");
+      log.info("[aceforge] v0.9.5 — all hooks, tools, commands, and evolution engine registered ");
     }
   };
 }
