@@ -1239,7 +1239,7 @@ function buildPlugin() {
         }
       });
 
-      log.info("[aceforge] v0.9.5 — all hooks, tools, commands, and evolution engine registered ");
+      log.info("[aceforge] v0.9.6 — all hooks, tools, commands, and evolution engine registered ");
     }
   };
 }
