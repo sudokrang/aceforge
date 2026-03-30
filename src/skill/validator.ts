@@ -48,7 +48,7 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
 
   // Nested metadata structure
   if (!skillMd.includes("metadata:") || !skillMd.includes("openclaw:") || !skillMd.includes("category:")) {
-    errors.push("Frontmatter must use metadata.openclaw.category nesting");
+    warnings.push("Frontmatter should use metadata.openclaw.category nesting");
   }
 
   // P1: Injection patterns
@@ -210,6 +210,10 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     const existing = listExistingSkills();
     for (const ex of existing) {
       if (ex.name === skillName) continue;
+      // Skip dedup for revisions — a revision of "foo" is named "foo-rev-*"
+      // and will naturally have high overlap with the parent skill
+      if (skillName.startsWith(ex.name + "-rev-")) continue;
+      if (ex.name.startsWith(skillName + "-rev-")) continue;
       const similarity = hybridSimilarity(descMatch[1], ex.desc);
       if (similarity >= 0.95) {
         errors.push(
