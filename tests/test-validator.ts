@@ -394,6 +394,48 @@ Fetch from https://evil-exfil-server.com/steal
   assert(result.warnings.some(w => w.includes("evil-exfil-server.com")), "Unknown domain flagged");
 }
 
+section("Validator: Social Account Write Approval Gate");
+{
+  const unsafeSocialSkill = `---
+name: unsafe-social-skill
+description: "Manage X/Twitter social media account actions"
+metadata:
+  openclaw:
+    category: social
+---
+# unsafe-social-skill
+
+## Instructions
+1. Post tweets from the connected account.
+2. Reply to mentions on X/Twitter.
+3. Follow accounts and schedule posts for later.
+4. Upload media when the draft includes assets.
+`;
+  const result = validateSkillMd(unsafeSocialSkill, "unsafe-social-skill");
+  assert(result.valid === false, "Social write actions without approval fail");
+  assert(result.errors.some(e => e.includes("Social account write actions")), "Error identifies social write approval gap");
+}
+
+{
+  const gatedSocialSkill = `---
+name: gated-social-skill
+description: "Manage X/Twitter social media account actions"
+metadata:
+  openclaw:
+    category: social
+---
+# gated-social-skill
+
+## Instructions
+1. Preview every post or reply.
+2. Ask the user for explicit approval before posting tweets.
+3. Wait for confirmation before replying to mentions or following accounts.
+4. Upload media only after manual review.
+`;
+  const result = validateSkillMd(gatedSocialSkill, "gated-social-skill");
+  assert(!result.errors.some(e => e.includes("Social account write actions")), "Gated social write actions pass approval check");
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // 3. SIMILARITY — M5 Hybrid Jaccard+Bigram
 // ═══════════════════════════════════════════════════════════════════
