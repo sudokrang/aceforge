@@ -199,6 +199,20 @@ export function validateSkillMd(skillMd: string, skillName: string): ValidationR
     }
   }
 
+  // Social account write actions should declare a user approval gate.
+  const socialPlatformContext = /\b(?:tweet|twitter|x\/twitter|x account|social media|social account|mentions?|followers?|direct message|dm)\b/i;
+  const socialWritePatterns = [
+    /\b(?:post|publish|schedule|delete)\s+(?:a\s+)?(?:tweet|post|reply|dm|direct message)s?\b/i,
+    /\breply\s+to\s+(?:mentions?|users?|posts?|tweets?)\b/i,
+    /\b(?:follow|unfollow|block|mute)\s+(?:accounts?|users?|followers?)\b/i,
+    /\bupload\s+media\b/i,
+  ];
+  const approvalGatePattern = /\b(?:explicit\s+)?(?:approval|confirmation|consent)\b|\bprompt\s+(?:the\s+)?user\b|\bask\s+(?:the\s+)?user\b|\bdry[-\s]?run\b|\bpreview\b|\bmanual review\b/i;
+  const socialWriteCount = socialWritePatterns.filter(pattern => pattern.test(skillMd)).length;
+  if (socialPlatformContext.test(skillMd) && socialWriteCount >= 2 && !approvalGatePattern.test(skillMd)) {
+    errors.push("Social account write actions require explicit approval or confirmation gates");
+  }
+
   // Length check
   if (lines.length > 500) {
     errors.push(`SKILL.md exceeds 500 lines (${lines.length})`);
